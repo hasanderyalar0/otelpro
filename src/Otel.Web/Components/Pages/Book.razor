@@ -1,0 +1,1870 @@
+@page "/book"
+@layout Otel.Web.Components.Layout.PublicLayout
+@inject AppDb Db
+@inject BookingService Booking
+
+<div class="booking-portal">
+    <!-- Üst Başlık ve Tesis Bilgisi -->
+    <div class="booking-header">
+        <span class="booking-tag">🛎️ Komisyonsuz Doğrudan Otel Rezervasyonu</span>
+        <h1>@(selectedHotelId == 0 ? "Global & Türkiye Otellerimiz (16 Tesis)" : (currentHotel?.Name ?? "Lüks Otel Rezervasyonu"))</h1>
+        <p class="hotel-sub">
+            @if (selectedHotelId == 0)
+            {
+                <span>🌍 Bodrum'dan İsviçre Alplerine, Manhattan'dan Tokyo'ya 16 Farklı 5 Yıldızlı Lüks Tesis · En İyi Fiyat Garantisi</span>
+            }
+            else
+            {
+                <span>📍 @(currentHotel?.City ?? "Türkiye") · ⭐ 5 Yıldızlı Lüks Deneyim · En İyi Fiyat Garantisi & Doğrudan İptal Güvencesi</span>
+            }
+        </p>
+    </div>
+
+    <!-- 16 OTELİN TAMAMINI GÖSTEREN VİTRİN & DESTİNASYON KEŞİF PANELİ -->
+    <div class="hotels-explorer-card">
+        <div class="explorer-top-row">
+            <div class="explorer-title-box">
+                <span class="icon">🏨</span>
+                <div>
+                    <h3>Tüm Otellerimizi Keşfedin (16 Tesis)</h3>
+                    <small class="muted">Aşağıdan dilediğiniz oteli seçerek odalarını inceleyebilir veya tüm tesislerin müsait odalarını birlikte karşılaştırabilirsiniz.</small>
+                </div>
+            </div>
+
+            <!-- Bölge Filtreleme Butonları -->
+            <div class="region-filter-tabs">
+                <button class="region-tab @(regionFilter == "all" ? "active" : "")" @onclick='() => SetRegionFilter("all")'>
+                    🌟 Tümü (16 Otel)
+                </button>
+                <button class="region-tab @(regionFilter == "tr" ? "active" : "")" @onclick='() => SetRegionFilter("tr")'>
+                    🇹🇷 Türkiye (8 Tesis)
+                </button>
+                <button class="region-tab @(regionFilter == "global" ? "active" : "")" @onclick='() => SetRegionFilter("global")'>
+                    ✈️ Yurt Dışı (8 Tesis)
+                </button>
+                <button class="region-tab list-all-btn @(selectedHotelId == 0 ? "active" : "")" @onclick="() => SwitchHotel(0)">
+                    🌐 Tüm Odaları Birlikte Listele
+                </button>
+            </div>
+        </div>
+
+        <!-- 16 Otel Kartları Izgarası -->
+        <div class="hotels-showcase-grid">
+            @foreach (var h in displayedHotels)
+            {
+                var isSelected = selectedHotelId == h.Id;
+                var flag = GetHotelFlag(h);
+                var img = GetHotelImage(h);
+                var highlight = GetHotelHighlight(h);
+                var startPrice = GetHotelStartingPrice(h);
+                var conceptText = GetHotelDefaultConceptText(h);
+
+                <div class="hotel-showcase-card @(isSelected ? "selected" : "")" @onclick="() => SwitchHotel(h.Id)">
+                    <div class="hotel-card-media">
+                        <img src="@img" alt="@h.Name" loading="lazy" />
+                        <span class="hotel-flag-badge">@flag @h.City</span>
+                        <span class="hotel-concept-badge">@conceptText</span>
+                        @if (isSelected)
+                        {
+                            <div class="selected-overlay-badge">
+                                <span>✓ SEÇİLİ TESİS</span>
+                            </div>
+                        }
+                    </div>
+                    <div class="hotel-card-body">
+                        <div class="hotel-card-name-row">
+                            <h4 title="@h.Name">@h.Name</h4>
+                            <span class="stars-badge">⭐⭐⭐⭐⭐</span>
+                        </div>
+                        <p class="hotel-highlight-tag">📍 @highlight</p>
+                        <div class="hotel-card-footer">
+                            <div class="hotel-price-tag">
+                                <small>Gecelik</small>
+                                <b>@Fmt.Money(startPrice)</b><small>'den</small>
+                            </div>
+                            <button class="btn-select-hotel @(isSelected ? "active" : "")">
+                                @(isSelected ? "Odaları Gösteriliyor" : "Bu Oteli Seç ➜")
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+    </div>
+
+    <!-- Tarih, Kişi ve Otel Hızlı Arama Çubuğu -->
+    <div class="search-bar-card">
+        <div class="search-inputs-grid">
+            <div class="input-block hotel-selector-block">
+                <label>🏨 Seçili Otel / Destinasyon</label>
+                <select @bind="selectedHotelId" @bind:after="OnHotelDropdownChanged">
+                    <option value="0">🌟 Tüm Oteller (16 Tesis - Birlikte Karşılaştır)</option>
+                    <optgroup label="🇹🇷 Türkiye Otelleri (8 Tesis)">
+                        @foreach (var h in hotels.Where(IsDomesticHotel))
+                        {
+                            <option value="@h.Id">🇹🇷 @h.Name (@h.City)</option>
+                        }
+                    </optgroup>
+                    <optgroup label="🌍 Global & Yurt Dışı Otelleri (8 Tesis)">
+                        @foreach (var h in hotels.Where(h => !IsDomesticHotel(h)))
+                        {
+                            <option value="@h.Id">@GetHotelFlag(h) @h.Name (@h.City)</option>
+                        }
+                    </optgroup>
+                </select>
+            </div>
+            <div class="input-block">
+                <label>📅 Giriş Tarihi</label>
+                <input type="date" @bind="checkIn" @bind:after="SearchRooms" />
+            </div>
+            <div class="input-block">
+                <label>📅 Çıkış Tarihi</label>
+                <input type="date" @bind="checkOut" @bind:after="SearchRooms" />
+            </div>
+            <div class="input-block">
+                <label>👥 Yetişkin</label>
+                <input type="number" min="1" max="6" @bind="adults" @bind:after="SearchRooms" />
+            </div>
+            <div class="input-block">
+                <label>🧒 Çocuk</label>
+                <input type="number" min="0" max="4" @bind="children" @bind:after="SearchRooms" />
+            </div>
+            <div class="input-block btn-block">
+                <button class="btn-search-trigger" @onclick="SearchRooms">
+                    🔍 Müsaitlik Ara
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Gelişmiş Filtreleme Barı (Pansiyon / Yemek Tipi ve Oda Özellikleri) -->
+    <div class="filter-strip-card">
+        <div class="filter-section-title">
+            <span class="icon">✨</span>
+            <span><b>Konaklama & Yemek Konsepti Tercihi:</b></span>
+            <small class="muted" style="margin-left:8px;font-size:0.82rem">Her otelin kendi orijinal konsepti farklıdır (Ultra Her Şey Dahil, Yarım Pansiyon, Gurme Kahvaltı vb.)</small>
+        </div>
+        
+        <!-- Pansiyon / Yemek Seçenekleri -->
+        <div class="filter-pills-row">
+            <button class="filter-pill @(selectedBoardCode == null ? "active" : "")" @onclick="() => SetBoardFilter(null)">
+                🌟 Otel Orijinal Konsepti <span class="pill-badge">Önerilen</span>
+            </button>
+            <button class="filter-pill @(selectedBoardCode == "RO" ? "active" : "")" @onclick='() => SetBoardFilter("RO")'>
+                🛏️ Sadece Oda (Room Only)
+            </button>
+            <button class="filter-pill @(selectedBoardCode == "BB" ? "active" : "")" @onclick='() => SetBoardFilter("BB")'>
+                ☕ Kahvaltı Dahil (Oda + Kahvaltı)
+            </button>
+            <button class="filter-pill @(selectedBoardCode == "HB" ? "active" : "")" @onclick='() => SetBoardFilter("HB")'>
+                🍽️ Yarım Pansiyon (Sabah + Akşam)
+            </button>
+            <button class="filter-pill @(selectedBoardCode == "FB" ? "active" : "")" @onclick='() => SetBoardFilter("FB")'>
+                🍲 Tam Pansiyon (3 Öğün Açık Büfe)
+            </button>
+            <button class="filter-pill @(selectedBoardCode == "AI" ? "active" : "")" @onclick='() => SetBoardFilter("AI")'>
+                🍸 Ultra Her Şey Dahil (Yemek + İçecek)
+            </button>
+        </div>
+
+        <div class="filter-divider"></div>
+
+        <!-- Oda Tipi / Manzara Özellikleri ve Sıralama -->
+        <div class="filter-secondary-row">
+            <div class="amenity-filters">
+                <span class="sub-label">Özel Filtre:</span>
+                <button class="tag-btn @(featureFilter == null ? "active" : "")" @onclick="() => featureFilter = null">
+                    Tüm Odalar
+                </button>
+                <button class="tag-btn @(featureFilter == "sea" ? "active" : "")" @onclick='() => featureFilter = (featureFilter == "sea" ? null : "sea")'>
+                    🌊 Deniz Manzaralı
+                </button>
+                <button class="tag-btn @(featureFilter == "jacuzzi" ? "active" : "")" @onclick='() => featureFilter = (featureFilter == "jacuzzi" ? null : "jacuzzi")'>
+                    🛁 Jakuzili / VIP Suit
+                </button>
+                <button class="tag-btn @(featureFilter == "family" ? "active" : "")" @onclick='() => featureFilter = (featureFilter == "family" ? null : "family")'>
+                    👨‍👩‍👧 Geniş Aile Odası
+                </button>
+                <button class="tag-btn @(featureFilter == "balcony" ? "active" : "")" @onclick='() => featureFilter = (featureFilter == "balcony" ? null : "balcony")'>
+                    🏞️ Balkon / Teras
+                </button>
+            </div>
+
+            <!-- Sıralama -->
+            <div class="sort-select-wrap">
+                <span class="sub-label">Sırala:</span>
+                <select @bind="sortOption">
+                    <option value="price_asc">Fiyat: Düşükten Yükseğe</option>
+                    <option value="price_desc">Fiyat: Yüksekten Düşüğe</option>
+                    <option value="capacity">Kapasiteye Göre</option>
+                </select>
+            </div>
+        </div>
+    </div>
+
+    @if (bookedReservation != null)
+    {
+        <!-- Başarılı Rezervasyon Kutusu -->
+        <div class="booking-success-box">
+            <div class="celebrate-icon">🎉</div>
+            <h2>Rezervasyonunuz Başarıyla Alındı!</h2>
+            <p class="res-code-highlight">Rezervasyon Numaranız: <b>@bookedReservation.Code</b></p>
+            <p class="muted">
+                Tarafınıza SMS ve E-posta teyit bildirimleri iletilmiştir. Otel girişinde kimlik / pasaport ibraz etmeniz yeterlidir.
+            </p>
+            <button class="btn-primary-large" style="margin-top:20px" @onclick="ResetForm">
+                ＋ Başka Bir Rezervasyon Yap
+            </button>
+        </div>
+    }
+    else
+    {
+        <!-- Başlık ve Oda Sayısı Göstergesi -->
+        <div class="rooms-results-head">
+            <h3>
+                <span>Müsait Oda Seçenekleri</span>
+                <span class="badge b-ok" style="font-size:0.85rem">@filteredRoomTypes.Count Oda Tipi Listeleniyor</span>
+            </h3>
+            @if (selectedHotelId == 0)
+            {
+                <span class="muted" style="font-size:0.88rem">16 Tesisin tamamından oda tipleri karşılaştırılıyor</span>
+            }
+            else
+            {
+                <span class="muted" style="font-size:0.88rem">@(currentHotel?.Name) için doğrudan rezervasyon</span>
+            }
+        </div>
+
+        <!-- Oda Kartları Listesi -->
+        <div class="rooms-grid">
+            @if (filteredRoomTypes.Count == 0)
+            {
+                <div class="no-rooms-card">
+                    <span class="icon">🔍</span>
+                    <h3>Seçtiğiniz filtrelere uygun oda bulunamadı</h3>
+                    <p class="muted">Filtreleri sıfırlayarak tesisin diğer müsait odalarını inceleyebilirsiniz.</p>
+                    <button class="btn-secondary" @onclick="ResetFilters">Filtreleri Temizle</button>
+                </div>
+            }
+
+            @foreach (var rt in filteredRoomTypes)
+            {
+                var availCount = availableMap.GetValueOrDefault(rt.Id, 0);
+                var quote = quoteMap.GetValueOrDefault(rt.Id);
+                var nights = Math.Max(1, (checkOut - checkIn).Days);
+                var imgUrl = GetRoomImage(rt);
+                var hForRt = rt.Hotel ?? hotels.FirstOrDefault(x => x.Id == rt.HotelId) ?? currentHotel;
+                var mealBadge = GetRoomConceptBadge(hForRt, rt, selectedBoardCode);
+
+                <div class="room-card">
+                    <!-- Çoklu Otel Modunda Otel Başlık Şeridi -->
+                    @if (selectedHotelId == 0 || (currentHotel != null && rt.HotelId != currentHotel.Id))
+                    {
+                        var flag = GetHotelFlag(hForRt);
+                        <div class="room-hotel-badge">
+                            <span class="hotel-flag">@flag</span>
+                            <span class="hotel-title"><b>@(hForRt?.Name ?? "Otel")</b></span>
+                            <span class="hotel-city">📍 @(hForRt?.City ?? "")</span>
+                        </div>
+                    }
+
+                    <!-- Fotoğraf Alanı -->
+                    <div class="room-media-wrap" @onclick="() => OpenPhotoModal(rt)">
+                        <img src="@imgUrl" alt="@rt.Name" class="room-img" loading="lazy" />
+                        
+                        <!-- Fotoğraf Üzeri Rozetler (Orijinal Konsepte Göre Dinamik) -->
+                        <div class="room-photo-badges">
+                            <span class="badge-float meal">@mealBadge</span>
+
+                            @if (rt.Name.Contains("Deniz"))
+                            {
+                                <span class="badge-float sea">🌊 Deniz Manzaralı</span>
+                            }
+                            else if (rt.Name.Contains("Suit"))
+                            {
+                                <span class="badge-float jacuzzi">🛁 Özel Jakuzi & VIP</span>
+                            }
+                        </div>
+
+                        <!-- Fotoğraf Alt Şerit -->
+                        <div class="room-photo-meta">
+                            <span>👥 @rt.MaxCapacity Kişi</span>
+                            <span>📐 @rt.AreaM2 m²</span>
+                            <span>🛏️ @rt.BedType</span>
+                        </div>
+                    </div>
+
+                    <!-- Kart İçeriği -->
+                    <div class="room-content">
+                        <div class="room-title-row">
+                            <h3 class="room-title">@rt.Name</h3>
+                            <button class="btn-photo-zoom" title="Fotoğrafı Büyüt" @onclick="() => OpenPhotoModal(rt)">
+                                🔍 Fotoğraflar
+                            </button>
+                        </div>
+                        <p class="room-desc">@rt.Description</p>
+
+                        <!-- Oda İçi Donanım & Özellikler (Otele ve Odaya Özel) -->
+                        <div class="room-amenities-tags">
+                            @foreach (var am in GetRoomAmenityTags(rt, hForRt))
+                            {
+                                <span class="amenity-chip">@am</span>
+                            }
+                        </div>
+
+                        <div class="room-perk-note">
+                            ✔ Ücretsiz İptal Güvencesi & Girişte Ödeme İmkânı
+                        </div>
+                    </div>
+
+                    <!-- Fiyat ve Rezervasyon Butonu -->
+                    <div class="room-footer">
+                        @if (availCount > 0)
+                        {
+                            <div class="price-block">
+                                <div class="price-sub">@nights Gece Toplam Tutar:</div>
+                                <div class="price-main">
+                                    @Fmt.Money(quote?.Total ?? (rt.BasePrice * nights))
+                                </div>
+                                <div class="price-nightly">
+                                    Gecelik ortalama @Fmt.Money((quote?.Total ?? (rt.BasePrice * nights)) / nights)
+                                </div>
+                            </div>
+
+                            <div class="action-block">
+                                @if (availCount <= 2)
+                                {
+                                    <span class="avail-tag urgent">🔥 Son @availCount Oda!</span>
+                                }
+                                else
+                                {
+                                    <span class="avail-tag ok">🟢 @availCount Oda Müsait</span>
+                                }
+
+                                <button class="btn-book-now" @onclick="() => SelectRoomType(rt)">
+                                    ⚡ Rezervasyon Yap
+                                </button>
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="sold-out-box">
+                                <span class="sold-text">Bu tarihlerde kontenjan doldu</span>
+                                <small class="muted">Lütfen farklı tarih aralığı deneyin</small>
+                            </div>
+                        }
+                    </div>
+                </div>
+            }
+        </div>
+    }
+</div>
+
+<!-- Rezervasyon Tamamlama Modalı -->
+<Modal Show="showBookingModal" ShowChanged="(v) => showBookingModal = v" Title="@(selectedRt != null ? $"{selectedRt.Name} Rezervasyonu" : "Rezervasyon")">
+    @if (selectedRt != null)
+    {
+        var hModal = selectedRt.Hotel ?? hotels.FirstOrDefault(x => x.Id == selectedRt.HotelId) ?? currentHotel;
+
+        <div class="modal-booking-wrap">
+            <!-- Seçilen Oda & Otel Özeti -->
+            <div class="modal-room-summary">
+                <img src="@GetRoomImage(selectedRt)" alt="@selectedRt.Name" class="summary-thumb" />
+                <div>
+                    <h4 style="margin:0 0 4px">@selectedRt.Name</h4>
+                    <div style="font-size:0.85rem;color:#38bdf8;font-weight:600;margin-bottom:4px">
+                        🏨 @(hModal?.Name) (@(hModal?.City))
+                    </div>
+                    <small class="muted">
+                        📅 @checkIn.ToString("dd.MM.yyyy") – @checkOut.ToString("dd.MM.yyyy") (@((checkOut - checkIn).Days) Gece) · 👥 @adults Yetişkin @(children > 0 ? $"+ {children} Çocuk" : "")
+                    </small>
+                </div>
+            </div>
+
+            <!-- Form Alanları -->
+            <div class="form-grid-modal">
+                <div class="f-group">
+                    <label>Adınız (*)</label>
+                    <input @bind="guestFirstName" placeholder="Adınız" />
+                </div>
+                <div class="f-group">
+                    <label>Soyadınız (*)</label>
+                    <input @bind="guestLastName" placeholder="Soyadınız" />
+                </div>
+                <div class="f-group">
+                    <label>E-Posta Adresiniz (*)</label>
+                    <input type="email" @bind="guestEmail" placeholder="ornek@mail.com" />
+                </div>
+                <div class="f-group">
+                    <label>Telefon Numaranız (*)</label>
+                    <input type="tel" @bind="guestPhone" placeholder="05xx xxx xx xx" />
+                </div>
+                <div class="f-group">
+                    <label>T.C. Kimlik / Pasaport No</label>
+                    <input @bind="guestDocNo" placeholder="Kimlik no" />
+                </div>
+                <div class="f-group">
+                    <label>Pansiyon / Konaklama Konsepti (*)</label>
+                    <select @bind="boardTypeId" @bind:after="RecalculateSelected">
+                        @foreach (var bt in boardTypes)
+                        {
+                            var isDef = bt.Code == GetHotelDefaultBoardCode(hModal);
+                            <option value="@bt.Id">
+                                @(bt.Code switch {
+                                    "RO" => "🛏️ Sadece Oda (Room Only)",
+                                    "BB" => "☕ Oda Kahvaltı (Bed & Breakfast)",
+                                    "HB" => "🍽️ Yarım Pansiyon (Sabah + Akşam)",
+                                    "FB" => "🍲 Tam Pansiyon (3 Öğün Açık Büfe)",
+                                    "AI" => "🍸 Ultra Her Şey Dahil (Tüm İçecek & Öğünler)",
+                                    _ => bt.Name
+                                })
+                                @(bt.PerPersonPerNight > 0 ? $" (+{Fmt.Money(bt.PerPersonPerNight)}/kişi/gece)" : " (Ek Ücretsiz)")
+                                @(isDef ? " [Bu Tesisin Standart Konsepti]" : "")
+                            </option>
+                        }
+                    </select>
+                </div>
+                <div class="f-group full-width">
+                    <label>Özel İstekleriniz</label>
+                    <textarea rows="2" @bind="bookingNotes" placeholder="Yüksek kat, çift kişilik yatak, geç giriş vb..."></textarea>
+                </div>
+            </div>
+
+            @if (selectedQuote != null)
+            {
+                <div class="modal-pricing-box">
+                    <div class="sum-row">
+                        <span>Konaklama Tutarı (@selectedQuote.Nights Gece):</span>
+                        <b>@Fmt.Money(selectedQuote.RoomTotal)</b>
+                    </div>
+                    @if (selectedQuote.BoardTotal > 0)
+                    {
+                        <div class="sum-row">
+                            <span>Yemek & Pansiyon Bedeli:</span>
+                            <b>+@Fmt.Money(selectedQuote.BoardTotal)</b>
+                        </div>
+                    }
+                    <div class="sum-row total">
+                        <span>Ödenecek Toplam Tutar:</span>
+                        <span class="total-val">@Fmt.Money(selectedQuote.Total)</span>
+                    </div>
+                </div>
+            }
+
+            @if (!string.IsNullOrEmpty(modalError))
+            {
+                <div class="alert bad" style="margin-top:12px">@modalError</div>
+            }
+
+            <div style="display:flex;justify-content:flex-end;margin-top:20px;gap:12px">
+                <button class="btn-cancel" @onclick="() => showBookingModal = false">İptal</button>
+                <button class="btn-primary-large" @onclick="CompleteGuestBooking" disabled="@isSubmitting">
+                    @(isSubmitting ? "İşleniyor..." : "⚡ Rezervasyonu Onayla")
+                </button>
+            </div>
+        </div>
+    }
+</Modal>
+
+<!-- Fotoğraf Büyütme (Lightbox) Modalı -->
+@if (showPhotoModal && photoModalRt != null)
+{
+    var hPhoto = photoModalRt.Hotel ?? hotels.FirstOrDefault(x => x.Id == photoModalRt.HotelId) ?? currentHotel;
+    <div class="modal-backdrop" @onclick="() => showPhotoModal = false">
+        <div class="photo-modal-card" @onclick:stopPropagation>
+            <div class="photo-modal-head">
+                <div>
+                    <h3>@photoModalRt.Name</h3>
+                    <small class="muted">@(hPhoto?.Name) (@(hPhoto?.City)) · @photoModalRt.AreaM2 m² · @photoModalRt.BedType</small>
+                </div>
+                <button class="close-btn" @onclick="() => showPhotoModal = false">✕</button>
+            </div>
+            <div class="photo-modal-img-wrap">
+                <img src="@GetRoomImage(photoModalRt)" alt="@photoModalRt.Name" class="photo-modal-large" />
+            </div>
+            <div class="photo-modal-foot">
+                <p style="margin:0 0 14px;color:#cbd5e1;font-size:0.92rem">@photoModalRt.Description</p>
+                <button class="btn-primary-large" style="width:100%" @onclick="() => { showPhotoModal = false; SelectRoomType(photoModalRt); }">
+                    Bu Odayı Seç ve Rezervasyon Yap
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+<style>
+.booking-portal {
+    max-width: 1300px;
+    margin: 0 auto;
+    padding: 24px 20px 80px;
+    color: #f1f5f9;
+}
+.booking-header {
+    text-align: center;
+    margin-bottom: 24px;
+}
+.booking-tag {
+    display: inline-block;
+    padding: 6px 16px;
+    border-radius: 999px;
+    background: hsla(172, 78%, 52%, 0.12);
+    border: 1px solid hsla(172, 78%, 52%, 0.35);
+    color: #2dd4bf;
+    font-size: 0.85rem;
+    font-weight: 700;
+    margin-bottom: 12px;
+}
+.booking-header h1 {
+    font-size: 2.4rem;
+    margin: 0 0 8px;
+    font-weight: 800;
+    letter-spacing: -0.5px;
+}
+.hotel-sub {
+    font-size: 1.05rem;
+    color: #94a3b8;
+    margin: 0 0 16px;
+}
+
+/* 16 Otel Vitrin & Keşif Kartı */
+.hotels-explorer-card {
+    background: linear-gradient(145deg, hsla(222, 47%, 14%, 0.95), hsla(222, 47%, 10%, 0.95));
+    border: 1px solid hsla(217, 33%, 26%, 0.8);
+    border-radius: 20px;
+    padding: 20px 24px;
+    margin-bottom: 24px;
+    box-shadow: 0 12px 36px -10px rgba(0, 0, 0, 0.5);
+}
+.explorer-top-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 16px;
+    margin-bottom: 18px;
+    padding-bottom: 14px;
+    border-bottom: 1px solid hsla(217, 33%, 22%, 0.8);
+}
+.explorer-title-box {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+.explorer-title-box .icon {
+    font-size: 1.8rem;
+    background: hsla(172, 78%, 52%, 0.15);
+    width: 44px;
+    height: 44px;
+    border-radius: 12px;
+    display: grid;
+    place-items: center;
+}
+.explorer-title-box h3 {
+    margin: 0 0 2px;
+    font-size: 1.2rem;
+    color: #fff;
+    font-weight: 700;
+}
+.region-filter-tabs {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+.region-tab {
+    background: hsla(217, 33%, 18%, 0.7);
+    border: 1px solid hsla(217, 33%, 28%, 0.8);
+    color: #cbd5e1;
+    padding: 7px 14px;
+    border-radius: 10px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+.region-tab:hover, .region-tab.active {
+    background: #0ea5e9;
+    border-color: #0ea5e9;
+    color: #fff;
+}
+.region-tab.list-all-btn {
+    background: hsla(172, 78%, 52%, 0.15);
+    border-color: hsla(172, 78%, 52%, 0.4);
+    color: #2dd4bf;
+}
+.region-tab.list-all-btn:hover, .region-tab.list-all-btn.active {
+    background: #14b8a6;
+    border-color: #14b8a6;
+    color: #04121e;
+    font-weight: 700;
+}
+
+/* 16 Otel Kartları Izgarası */
+.hotels-showcase-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 16px;
+    max-height: 420px;
+    overflow-y: auto;
+    padding-right: 6px;
+}
+.hotels-showcase-grid::-webkit-scrollbar {
+    width: 6px;
+}
+.hotels-showcase-grid::-webkit-scrollbar-thumb {
+    background: #334155;
+    border-radius: 4px;
+}
+.hotel-showcase-card {
+    background: hsla(222, 47%, 16%, 0.7);
+    border: 1px solid hsla(217, 33%, 24%, 0.8);
+    border-radius: 14px;
+    overflow: hidden;
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    transition: all 0.22s ease;
+}
+.hotel-showcase-card:hover {
+    border-color: #38bdf8;
+    transform: translateY(-3px);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+}
+.hotel-showcase-card.selected {
+    border-color: #2dd4bf;
+    background: hsla(172, 78%, 52%, 0.08);
+    box-shadow: 0 0 0 2px rgba(45, 212, 191, 0.4);
+}
+.hotel-card-media {
+    height: 120px;
+    position: relative;
+    overflow: hidden;
+}
+.hotel-card-media img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: transform 0.35s ease;
+}
+.hotel-showcase-card:hover .hotel-card-media img {
+    transform: scale(1.08);
+}
+.hotel-flag-badge {
+    position: absolute;
+    top: 8px;
+    left: 8px;
+    background: rgba(15, 23, 42, 0.85);
+    backdrop-filter: blur(8px);
+    padding: 3px 8px;
+    border-radius: 6px;
+    font-size: 0.76rem;
+    font-weight: 700;
+    color: #f1f5f9;
+}
+.hotel-concept-badge {
+    position: absolute;
+    bottom: 8px;
+    right: 8px;
+    background: rgba(14, 165, 233, 0.9);
+    padding: 3px 8px;
+    border-radius: 6px;
+    font-size: 0.72rem;
+    font-weight: 700;
+    color: #fff;
+    backdrop-filter: blur(8px);
+}
+.selected-overlay-badge {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    background: #10b981;
+    color: #022c22;
+    padding: 3px 8px;
+    border-radius: 6px;
+    font-size: 0.72rem;
+    font-weight: 800;
+}
+.hotel-card-body {
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    flex-grow: 1;
+}
+.hotel-card-name-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 8px;
+    margin-bottom: 4px;
+}
+.hotel-card-name-row h4 {
+    margin: 0;
+    font-size: 0.94rem;
+    font-weight: 700;
+    color: #fff;
+    line-height: 1.25;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+.stars-badge {
+    font-size: 0.7rem;
+    letter-spacing: -2px;
+    white-space: nowrap;
+}
+.hotel-highlight-tag {
+    font-size: 0.78rem;
+    color: #94a3b8;
+    margin: 0 0 10px;
+    display: -webkit-box;
+    -webkit-line-clamp: 1;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+.hotel-card-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: auto;
+    padding-top: 8px;
+    border-top: 1px solid hsla(217, 33%, 22%, 0.6);
+}
+.hotel-price-tag small {
+    display: block;
+    font-size: 0.68rem;
+    color: #94a3b8;
+}
+.hotel-price-tag b {
+    font-size: 1.05rem;
+    color: #2dd4bf;
+}
+.btn-select-hotel {
+    background: transparent;
+    border: 1px solid #38bdf8;
+    color: #38bdf8;
+    padding: 5px 10px;
+    border-radius: 8px;
+    font-size: 0.78rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+.btn-select-hotel.active {
+    background: #2dd4bf;
+    border-color: #2dd4bf;
+    color: #04121e;
+    font-weight: 700;
+}
+
+/* Arama Barı */
+.search-bar-card {
+    background: linear-gradient(145deg, hsla(222, 47%, 14%, 0.95), hsla(222, 47%, 10%, 0.95));
+    border: 1px solid hsla(217, 33%, 25%, 0.8);
+    border-radius: 20px;
+    padding: 20px 24px;
+    box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.5);
+    margin-bottom: 22px;
+}
+.search-inputs-grid {
+    display: grid;
+    grid-template-columns: 1.8fr 1fr 1fr 0.7fr 0.7fr 1.1fr;
+    gap: 14px;
+    align-items: flex-end;
+}
+@@media (max-width: 1024px) {
+    .search-inputs-grid {
+        grid-template-columns: 1fr 1fr;
+    }
+}
+@@media (max-width: 640px) {
+    .search-inputs-grid {
+        grid-template-columns: 1fr;
+    }
+}
+.input-block label {
+    display: block;
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: #cbd5e1;
+    margin-bottom: 6px;
+}
+.input-block input, .input-block select {
+    width: 100%;
+    padding: 10px 14px;
+    border-radius: 10px;
+    background: #0f172a;
+    border: 1px solid #334155;
+    color: #fff;
+    outline: none;
+    font-size: 0.92rem;
+}
+.input-block input:focus, .input-block select:focus {
+    border-color: #2dd4bf;
+}
+.btn-search-trigger {
+    width: 100%;
+    background: linear-gradient(135deg, #0ea5e9, #0d9488);
+    color: #fff;
+    border: none;
+    padding: 11px 18px;
+    border-radius: 10px;
+    font-weight: 700;
+    font-size: 0.95rem;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+.btn-search-trigger:hover {
+    box-shadow: 0 6px 18px rgba(14, 165, 233, 0.4);
+}
+
+/* Filtreleme Paneli */
+.filter-strip-card {
+    background: hsla(222, 47%, 13%, 0.8);
+    border: 1px solid hsla(217, 33%, 22%, 0.8);
+    border-radius: 18px;
+    padding: 20px 24px;
+    margin-bottom: 24px;
+}
+.filter-section-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.95rem;
+    color: #e2e8f0;
+    margin-bottom: 12px;
+}
+.filter-pills-row {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    align-items: center;
+}
+.filter-pill {
+    background: hsla(217, 33%, 18%, 0.7);
+    border: 1px solid hsla(217, 33%, 28%, 0.8);
+    color: #cbd5e1;
+    padding: 8px 16px;
+    border-radius: 10px;
+    font-size: 0.88rem;
+    font-weight: 600;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    transition: all 0.2s;
+}
+.filter-pill:hover, .filter-pill.active {
+    background: #0ea5e9;
+    border-color: #0ea5e9;
+    color: #fff;
+    transform: translateY(-1px);
+}
+.pill-badge {
+    background: hsla(0, 0%, 100%, 0.2);
+    font-size: 0.7rem;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-weight: 700;
+}
+.filter-divider {
+    height: 1px;
+    background: hsla(217, 33%, 22%, 0.8);
+    margin: 16px 0;
+}
+.filter-secondary-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 14px;
+}
+.amenity-filters {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+.sub-label {
+    font-size: 0.82rem;
+    color: #94a3b8;
+    font-weight: 600;
+    margin-right: 4px;
+}
+.tag-btn {
+    background: transparent;
+    border: 1px solid hsla(217, 33%, 26%, 0.8);
+    color: #cbd5e1;
+    padding: 6px 12px;
+    border-radius: 8px;
+    font-size: 0.82rem;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+.tag-btn:hover, .tag-btn.active {
+    background: hsla(172, 78%, 52%, 0.15);
+    border-color: #2dd4bf;
+    color: #2dd4bf;
+}
+.sort-select-wrap select {
+    background: #0f172a;
+    border: 1px solid #334155;
+    color: #fff;
+    padding: 6px 12px;
+    border-radius: 8px;
+    font-size: 0.82rem;
+    cursor: pointer;
+}
+
+/* Oda Listeleme Başlığı */
+.rooms-results-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 18px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid hsla(217, 33%, 20%, 0.8);
+    flex-wrap: wrap;
+    gap: 10px;
+}
+.rooms-results-head h3 {
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 1.3rem;
+}
+
+/* Oda Kartları Grid */
+.rooms-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+    gap: 26px;
+}
+.room-card {
+    background: hsla(222, 47%, 13%, 0.85);
+    border: 1px solid hsla(217, 33%, 22%, 0.8);
+    border-radius: 20px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    transition: all 0.25s ease;
+}
+.room-card:hover {
+    border-color: hsla(172, 78%, 52%, 0.5);
+    transform: translateY(-4px);
+    box-shadow: 0 16px 36px -10px rgba(0, 0, 0, 0.6);
+}
+
+/* Oda Kartı Üzeri Otel Başlık Rozeti */
+.room-hotel-badge {
+    background: linear-gradient(90deg, hsla(217, 91%, 60%, 0.25), hsla(222, 47%, 12%, 0.9));
+    padding: 8px 14px;
+    border-bottom: 1px solid hsla(217, 33%, 24%, 0.8);
+    font-size: 0.86rem;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.room-hotel-badge .hotel-flag {
+    font-size: 1.1rem;
+}
+.room-hotel-badge .hotel-title {
+    color: #38bdf8;
+}
+.room-hotel-badge .hotel-city {
+    color: #94a3b8;
+    margin-left: auto;
+    font-size: 0.8rem;
+}
+
+.room-media-wrap {
+    height: 220px;
+    position: relative;
+    overflow: hidden;
+    cursor: pointer;
+}
+.room-img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: transform 0.4s ease;
+}
+.room-card:hover .room-img {
+    transform: scale(1.05);
+}
+.room-photo-badges {
+    position: absolute;
+    top: 12px;
+    left: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    z-index: 2;
+}
+.badge-float {
+    padding: 5px 12px;
+    border-radius: 8px;
+    font-size: 0.78rem;
+    font-weight: 700;
+    backdrop-filter: blur(8px);
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.4);
+}
+.badge-float.meal {
+    background: linear-gradient(135deg, rgba(14, 165, 233, 0.95), rgba(99, 102, 241, 0.9));
+    color: #fff;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+}
+.badge-float.sea {
+    background: rgba(45, 212, 191, 0.95);
+    color: #04121e;
+}
+.badge-float.jacuzzi {
+    background: rgba(168, 85, 247, 0.95);
+    color: #fff;
+}
+.room-photo-meta {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    padding: 8px 14px;
+    background: linear-gradient(to top, rgba(0, 0, 0, 0.85), transparent);
+    display: flex;
+    gap: 12px;
+    font-size: 0.8rem;
+    color: #f1f5f9;
+    font-weight: 600;
+}
+.room-content {
+    padding: 20px;
+    flex-grow: 1;
+    display: flex;
+    flex-direction: column;
+}
+.room-title-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+}
+.room-title {
+    font-size: 1.3rem;
+    margin: 0;
+    color: #fff;
+    font-weight: 700;
+}
+.btn-photo-zoom {
+    background: transparent;
+    border: none;
+    color: #38bdf8;
+    font-size: 0.8rem;
+    font-weight: 600;
+    cursor: pointer;
+}
+.btn-photo-zoom:hover {
+    text-decoration: underline;
+}
+.room-desc {
+    font-size: 0.88rem;
+    color: #94a3b8;
+    line-height: 1.45;
+    margin: 0 0 14px;
+}
+.room-amenities-tags {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin-bottom: 12px;
+}
+.amenity-chip {
+    background: hsla(217, 33%, 18%, 0.7);
+    color: #cbd5e1;
+    font-size: 0.75rem;
+    padding: 3px 8px;
+    border-radius: 6px;
+    font-weight: 500;
+}
+.room-perk-note {
+    font-size: 0.78rem;
+    color: #34d399;
+    margin-top: auto;
+    padding-top: 6px;
+}
+.room-footer {
+    padding: 16px 20px;
+    background: hsla(220, 40%, 10%, 0.6);
+    border-top: 1px solid hsla(217, 33%, 20%, 0.8);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+.price-block .price-sub {
+    font-size: 0.75rem;
+    color: #94a3b8;
+}
+.price-block .price-main {
+    font-size: 1.55rem;
+    font-weight: 800;
+    color: #2dd4bf;
+    line-height: 1.1;
+}
+.price-block .price-nightly {
+    font-size: 0.75rem;
+    color: #cbd5e1;
+}
+.action-block {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 6px;
+}
+.avail-tag {
+    font-size: 0.75rem;
+    font-weight: 700;
+    padding: 3px 8px;
+    border-radius: 6px;
+}
+.avail-tag.ok {
+    background: hsla(142, 71%, 45%, 0.15);
+    color: #34d399;
+}
+.avail-tag.urgent {
+    background: hsla(0, 84%, 60%, 0.15);
+    color: #f87171;
+    animation: pulse 1.5s infinite;
+}
+.btn-book-now {
+    background: linear-gradient(135deg, #0ea5e9, #0d9488);
+    color: #fff;
+    border: none;
+    padding: 9px 18px;
+    border-radius: 10px;
+    font-weight: 700;
+    font-size: 0.92rem;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+.btn-book-now:hover {
+    box-shadow: 0 4px 14px rgba(14, 165, 233, 0.4);
+    transform: translateY(-1px);
+}
+.sold-out-box {
+    text-align: right;
+}
+.sold-text {
+    display: block;
+    color: #ef4444;
+    font-weight: 700;
+    font-size: 0.92rem;
+}
+
+/* Modallar */
+.modal-booking-wrap {
+    padding: 10px 4px;
+}
+.modal-room-summary {
+    display: flex;
+    gap: 16px;
+    background: hsla(220, 40%, 10%, 0.7);
+    padding: 12px;
+    border-radius: 12px;
+    margin-bottom: 20px;
+    align-items: center;
+}
+.summary-thumb {
+    width: 80px;
+    height: 60px;
+    object-fit: cover;
+    border-radius: 8px;
+}
+.form-grid-modal {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+}
+.f-group label {
+    display: block;
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: #cbd5e1;
+    margin-bottom: 6px;
+}
+.f-group input, .f-group select, .f-group textarea {
+    width: 100%;
+    padding: 10px 12px;
+    border-radius: 8px;
+    background: #0f172a;
+    border: 1px solid #334155;
+    color: #fff;
+    outline: none;
+}
+.f-group.full-width {
+    grid-column: span 2;
+}
+.modal-pricing-box {
+    background: hsla(172, 78%, 52%, 0.08);
+    border: 1px solid hsla(172, 78%, 52%, 0.25);
+    border-radius: 12px;
+    padding: 14px;
+    margin-top: 18px;
+}
+.sum-row {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.88rem;
+    margin-bottom: 6px;
+    color: #cbd5e1;
+}
+.sum-row.total {
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px dashed hsla(172, 78%, 52%, 0.3);
+    font-size: 1.15rem;
+    font-weight: 800;
+    color: #fff;
+}
+.total-val {
+    color: #2dd4bf;
+}
+.btn-primary-large {
+    background: linear-gradient(135deg, #0ea5e9, #0d9488);
+    color: #fff;
+    border: none;
+    padding: 12px 24px;
+    border-radius: 10px;
+    font-weight: 700;
+    cursor: pointer;
+}
+.btn-cancel {
+    background: transparent;
+    border: 1px solid #475569;
+    color: #94a3b8;
+    padding: 12px 20px;
+    border-radius: 10px;
+    cursor: pointer;
+}
+
+/* Lightbox Modal */
+.modal-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.85);
+    backdrop-filter: blur(10px);
+    display: grid;
+    place-items: center;
+    z-index: 1000;
+    padding: 20px;
+}
+.photo-modal-card {
+    background: #0f172a;
+    border: 1px solid #334155;
+    border-radius: 20px;
+    max-width: 800px;
+    width: 100%;
+    overflow: hidden;
+}
+.photo-modal-head {
+    padding: 16px 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid #1e293b;
+}
+.photo-modal-head h3 {
+    margin: 0;
+    color: #fff;
+}
+.close-btn {
+    background: transparent;
+    border: none;
+    color: #94a3b8;
+    font-size: 1.4rem;
+    cursor: pointer;
+}
+.photo-modal-img-wrap {
+    height: 420px;
+    background: #020617;
+}
+.photo-modal-large {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+.photo-modal-foot {
+    padding: 16px 20px;
+}
+
+.booking-success-box {
+    background: linear-gradient(145deg, hsla(142, 71%, 45%, 0.12), hsla(222, 47%, 12%, 0.95));
+    border: 1px solid rgba(52, 211, 153, 0.4);
+    border-radius: 20px;
+    padding: 40px;
+    text-align: center;
+    margin: 30px 0;
+}
+.celebrate-icon {
+    font-size: 3.5rem;
+    margin-bottom: 10px;
+}
+.res-code-highlight {
+    font-size: 1.25rem;
+    color: #34d399;
+}
+</style>
+
+@code {
+    DateTime checkIn = DateTime.Today.AddDays(1);
+    DateTime checkOut = DateTime.Today.AddDays(3);
+    int adults = 2;
+    int children = 0;
+
+    List<RoomType> roomTypes = new();
+    List<BoardType> boardTypes = new();
+    Dictionary<int, int> availableMap = new();
+    Dictionary<int, PriceQuote> quoteMap = new();
+
+    List<Hotel> hotels = new();
+    int selectedHotelId;
+    Hotel? currentHotel;
+
+    // Filtreleme Değişkenleri
+    string regionFilter = "all"; // "all", "tr", "global"
+    string? selectedBoardCode = null; // null = Otel Orijinal Konsepti
+    string? featureFilter = null; // "sea", "jacuzzi", "family", "balcony"
+    string sortOption = "price_asc";
+
+    // Rezervasyon Modalı
+    RoomType? selectedRt;
+    PriceQuote? selectedQuote;
+    int boardTypeId;
+    bool showBookingModal;
+    bool isSubmitting;
+    string? modalError;
+
+    string guestFirstName = "";
+    string guestLastName = "";
+    string guestEmail = "";
+    string guestPhone = "";
+    string guestDocNo = "";
+    string bookingNotes = "";
+
+    Reservation? bookedReservation;
+
+    // Fotoğraf Lightbox Modalı
+    bool showPhotoModal = false;
+    RoomType? photoModalRt;
+
+    [SupplyParameterFromQuery(Name = "hotelId")]
+    public int? HotelId { get; set; }
+
+    List<Hotel> displayedHotels
+    {
+        get
+        {
+            if (regionFilter == "tr") return hotels.Where(IsDomesticHotel).ToList();
+            if (regionFilter == "global") return hotels.Where(h => !IsDomesticHotel(h)).ToList();
+            return hotels;
+        }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        hotels = await Db.Hotels.ToListAsync();
+        boardTypes = await Db.BoardTypes.ToListAsync();
+
+        if (HotelId.HasValue && hotels.Any(h => h.Id == HotelId.Value))
+        {
+            selectedHotelId = HotelId.Value;
+            currentHotel = hotels.First(h => h.Id == HotelId.Value);
+        }
+        else if (CurrentHotelState.SelectedHotelId > 0 && hotels.Any(h => h.Id == CurrentHotelState.SelectedHotelId))
+        {
+            selectedHotelId = CurrentHotelState.SelectedHotelId;
+            currentHotel = hotels.First(h => h.Id == CurrentHotelState.SelectedHotelId);
+        }
+        else if (hotels.Count > 0)
+        {
+            selectedHotelId = hotels[0].Id;
+            currentHotel = hotels[0];
+        }
+
+        // Tesisin varsayılan pansiyon tipini belirle
+        SyncDefaultBoardType();
+
+        await SearchRooms();
+    }
+
+    void SyncDefaultBoardType()
+    {
+        if (selectedBoardCode == null)
+        {
+            var defCode = GetHotelDefaultBoardCode(currentHotel);
+            var bObj = boardTypes.FirstOrDefault(b => b.Code == defCode) ?? boardTypes.FirstOrDefault();
+            if (bObj != null) boardTypeId = bObj.Id;
+        }
+    }
+
+    void SetRegionFilter(string reg)
+    {
+        regionFilter = reg;
+    }
+
+    async Task SwitchHotel(int hotelId)
+    {
+        selectedHotelId = hotelId;
+        if (hotelId == 0)
+        {
+            currentHotel = null;
+        }
+        else
+        {
+            currentHotel = hotels.FirstOrDefault(h => h.Id == hotelId);
+            _ = CurrentHotelState.SetHotelAsync(hotelId);
+        }
+
+        SyncDefaultBoardType();
+        await SearchRooms();
+    }
+
+    async Task OnHotelDropdownChanged()
+    {
+        await SwitchHotel(selectedHotelId);
+    }
+
+    async Task SetBoardFilter(string? code)
+    {
+        selectedBoardCode = code;
+        if (code != null)
+        {
+            var targetBoard = boardTypes.FirstOrDefault(b => b.Code == code);
+            if (targetBoard != null) boardTypeId = targetBoard.Id;
+        }
+        else
+        {
+            SyncDefaultBoardType();
+        }
+        await SearchRooms();
+    }
+
+    void ResetFilters()
+    {
+        selectedBoardCode = null;
+        featureFilter = null;
+        sortOption = "price_asc";
+        SyncDefaultBoardType();
+    }
+
+    List<RoomType> filteredRoomTypes
+    {
+        get
+        {
+            var list = roomTypes.AsEnumerable();
+
+            if (featureFilter == "sea")
+            {
+                list = list.Where(r => r.Name.Contains("Deniz", StringComparison.OrdinalIgnoreCase) ||
+                                       (r.Description != null && r.Description.Contains("deniz", StringComparison.OrdinalIgnoreCase)));
+            }
+            else if (featureFilter == "jacuzzi")
+            {
+                list = list.Where(r => r.Name.Contains("Suit", StringComparison.OrdinalIgnoreCase) ||
+                                       (r.Description != null && r.Description.Contains("jakuzi", StringComparison.OrdinalIgnoreCase)));
+            }
+            else if (featureFilter == "family")
+            {
+                list = list.Where(r => r.MaxCapacity >= 4 || r.Name.Contains("Aile", StringComparison.OrdinalIgnoreCase));
+            }
+            else if (featureFilter == "balcony")
+            {
+                list = list.Where(r => r.Name.Contains("Deluxe", StringComparison.OrdinalIgnoreCase) ||
+                                       r.Name.Contains("Deniz", StringComparison.OrdinalIgnoreCase));
+            }
+
+            if (sortOption == "price_asc")
+            {
+                list = list.OrderBy(r => quoteMap.TryGetValue(r.Id, out var q) ? q.Total : r.BasePrice);
+            }
+            else if (sortOption == "price_desc")
+            {
+                list = list.OrderByDescending(r => quoteMap.TryGetValue(r.Id, out var q) ? q.Total : r.BasePrice);
+            }
+            else if (sortOption == "capacity")
+            {
+                list = list.OrderByDescending(r => r.MaxCapacity);
+            }
+
+            return list.ToList();
+        }
+    }
+
+    async Task SearchRooms()
+    {
+        if (checkOut <= checkIn) checkOut = checkIn.AddDays(1);
+        availableMap.Clear();
+        quoteMap.Clear();
+
+        if (selectedHotelId == 0)
+        {
+            roomTypes = await Db.RoomTypes.Include(r => r.Hotel).ToListAsync();
+        }
+        else
+        {
+            roomTypes = await Db.RoomTypes.Include(r => r.Hotel).Where(r => r.HotelId == selectedHotelId).ToListAsync();
+        }
+
+        foreach (var rt in roomTypes)
+        {
+            var free = await Booking.FreeRoomsAsync(checkIn, checkOut, rt.Id);
+            availableMap[rt.Id] = free.Count;
+
+            var effectiveBoardId = boardTypeId;
+            if (selectedBoardCode == null)
+            {
+                var h = rt.Hotel ?? hotels.FirstOrDefault(x => x.Id == rt.HotelId) ?? currentHotel;
+                var defCode = GetHotelDefaultBoardCode(h);
+                var bObj = boardTypes.FirstOrDefault(b => b.Code == defCode);
+                if (bObj != null) effectiveBoardId = bObj.Id;
+            }
+
+            var q = await Booking.QuoteAsync(rt.Id, checkIn, checkOut, adults, children, effectiveBoardId, null);
+            quoteMap[rt.Id] = q;
+        }
+    }
+
+    string GetHotelFlag(Hotel? h)
+    {
+        if (h == null) return "🇹🇷";
+        var city = (h.City ?? "").ToLowerInvariant();
+        if (city.Contains("paris") || city.Contains("fransa")) return "🇫🇷";
+        if (city.Contains("londra") || city.Contains("ingiltere") || city.Contains("london")) return "🇬🇧";
+        if (city.Contains("new york") || city.Contains("abd")) return "🇺🇸";
+        if (city.Contains("dubai") || city.Contains("bae")) return "🇦🇪";
+        if (city.Contains("tokyo") || city.Contains("japonya")) return "🇯🇵";
+        if (city.Contains("roma") || city.Contains("italya") || city.Contains("rome")) return "🇮🇹";
+        if (city.Contains("bali") || city.Contains("endonezya")) return "🇮🇩";
+        if (city.Contains("alpler") || city.Contains("isviçre") || city.Contains("zürih") || city.Contains("zermatt")) return "🇨🇭";
+        return "🇹🇷";
+    }
+
+    bool IsDomesticHotel(Hotel h) => GetHotelFlag(h) == "🇹🇷";
+
+    string GetHotelDefaultBoardCode(Hotel? h)
+    {
+        if (h == null) return "BB";
+        var name = (h.Name ?? "").ToLowerInvariant();
+        var city = (h.City ?? "").ToLowerInvariant();
+
+        if (city.Contains("antalya") || name.Contains("all-inclusive")) return "AI";
+        if (city.Contains("dubai")) return "AI";
+        if (city.Contains("uludağ") || name.Contains("ski")) return "FB";
+        if (city.Contains("alpler") || city.Contains("isviçre")) return "HB";
+        if (city.Contains("new york") || city.Contains("londra") || city.Contains("london")) return "RO";
+        return "BB";
+    }
+
+    string GetHotelDefaultConceptText(Hotel h)
+    {
+        var city = (h.City ?? "").ToLowerInvariant();
+        var name = (h.Name ?? "").ToLowerInvariant();
+
+        if (city.Contains("antalya") || name.Contains("all-inclusive")) return "🍸 Ultra Her Şey Dahil";
+        if (city.Contains("dubai")) return "🍸 Ultra Lüks Her Şey Dahil";
+        if (city.Contains("uludağ") || name.Contains("ski")) return "🎿 Tam Pansiyon Plus";
+        if (city.Contains("alpler") || city.Contains("isviçre")) return "🧀 Yarım Pansiyon (Fondü)";
+        if (city.Contains("new york") || city.Contains("londra") || city.Contains("london")) return "🛏️ Sadece Oda (Merkezi)";
+        if (city.Contains("paris")) return "🥐 Gurme Kruvasan Kahvaltı";
+        if (city.Contains("tokyo")) return "🍱 Geleneksel Japon Kahvaltı";
+        if (city.Contains("bali")) return "🌴 Yüzen Tropikal Kahvaltı";
+        if (city.Contains("kapadokya") || city.Contains("nevşehir")) return "🎈 Balon Seyirli Köy Kahvaltısı";
+        if (city.Contains("bodrum")) return "☕ Ege Serpme Kahvaltı";
+        if (city.Contains("istanbul")) return "☕ Boğaz Manzaralı Kahvaltı";
+        if (city.Contains("çeşme")) return "🫒 Alaçatı Bahçe Kahvaltısı";
+        if (city.Contains("mardin")) return "🍯 Mezopotamya Kahvaltısı";
+        if (city.Contains("fethiye")) return "🍳 Akdeniz Açık Büfe";
+        return "☕ Açık Büfe Kahvaltı";
+    }
+
+    string GetRoomConceptBadge(Hotel? h, RoomType rt, string? forcedBoardCode)
+    {
+        if (!string.IsNullOrEmpty(forcedBoardCode))
+        {
+            return forcedBoardCode switch
+            {
+                "AI" => "🍸 Ultra Her Şey Dahil",
+                "FB" => "🍲 Tam Pansiyon (3 Öğün Açık Büfe)",
+                "HB" => "🍽️ Yarım Pansiyon (Sabah + Akşam)",
+                "BB" => "☕ Zengin Kahvaltı Dahil",
+                "RO" => "🛏️ Sadece Oda (Room Only)",
+                _ => "🛏️ Standart Konaklama"
+            };
+        }
+
+        var hCity = (h?.City ?? "").ToLowerInvariant();
+        var hName = (h?.Name ?? "").ToLowerInvariant();
+        var rName = (rt.Name ?? "").ToLowerInvariant();
+
+        if (hCity.Contains("antalya") || hName.Contains("all-inclusive"))
+            return "🍸 Ultra Her Şey Dahil (Açık Büfe + Limitsiz İçecek)";
+        if (hCity.Contains("dubai"))
+            return "🍸 Ultra Lüks Her Şey Dahil & Marina Lounge";
+        if (hCity.Contains("uludağ") || hName.Contains("ski"))
+            return "🎿 Tam Pansiyon Plus (3 Öğün + Sıcak Şarap & Çay)";
+        if (hCity.Contains("alpler") || hCity.Contains("isviçre"))
+            return "🧀 Yarım Pansiyon (Alp Kahvaltısı & Fondü Akşamı)";
+
+        if (hCity.Contains("new york"))
+        {
+            if (rName.Contains("suit")) return "☕ Manhattan Skyline Kahvaltı Dahil";
+            return "🛏️ Sadece Oda (Merkezi Broadway & 5th Ave)";
+        }
+        if (hCity.Contains("londra") || hCity.Contains("london"))
+        {
+            if (rName.Contains("suit")) return "☕ Westminster Kraliyet Kahvaltısı Dahil";
+            return "🛏️ Sadece Oda (Tarihi Westminster)";
+        }
+
+        if (hCity.Contains("paris"))
+            return "🥐 Fransız Gurme Kahvaltı (Kruvasan & Filtre Kahve)";
+        if (hCity.Contains("tokyo"))
+            return "🍱 Geleneksel Japon & Açık Büfe Kahvaltı";
+        if (hCity.Contains("roma") || hCity.Contains("rome"))
+            return "☕ İtalyan Espresso & Taze Fırın Kahvaltısı Dahil";
+        if (hCity.Contains("bali"))
+            return "🌴 Tropikal Yüzen Kahvaltı Dahil (Floating Breakfast)";
+        if (hCity.Contains("kapadokya") || hCity.Contains("nevşehir"))
+            return "🎈 Balon Seyirli Organik Köy Kahvaltısı Dahil";
+        if (hCity.Contains("bodrum") || hCity.Contains("muğla"))
+            return "☕ Ege Serpme & Organik Büfe Kahvaltısı Dahil";
+        if (hCity.Contains("istanbul") || hCity.Contains("beşiktaş"))
+            return "☕ Panoramik Boğaz Manzaralı Gurme Kahvaltı";
+        if (hCity.Contains("çeşme") || hCity.Contains("izmir"))
+            return "🫒 Alaçatı Doğal Bahçe Serpme Kahvaltısı";
+        if (hCity.Contains("mardin"))
+            return "🍯 Mezopotamya Yöresel Serpme Kahvaltısı";
+        if (hCity.Contains("fethiye"))
+            return "🍳 Akdeniz Açık Büfe Kahvaltı Dahil";
+
+        if (rName.Contains("suit"))
+            return "👑 VIP Konsept: Özel İkramlar Dahil";
+
+        return "☕ Açık Büfe Kahvaltı Dahil";
+    }
+
+    string GetHotelImage(Hotel? h)
+    {
+        if (h == null) return "/hero.jpg";
+        if (!string.IsNullOrEmpty(h.ImageUrl) && h.ImageUrl != "/hero.jpg") return h.ImageUrl;
+
+        var name = (h.Name ?? "").ToLowerInvariant();
+        var city = (h.City ?? "").ToLowerInvariant();
+
+        if (city.Contains("istanbul") || name.Contains("bosphorus")) return "/images/istanbul_bosphorus.jpg";
+        if (city.Contains("antalya") || name.Contains("riviera")) return "/images/duden_waterfall.jpg";
+        if (city.Contains("kapadokya") || city.Contains("nevşehir") || name.Contains("cave")) return "/images/cappadocia_balloon.jpg";
+        if (city.Contains("çeşme") || city.Contains("alaçatı")) return "/images/windsurf_cesme.jpg";
+        if (city.Contains("uludağ") || city.Contains("bursa") || name.Contains("ski")) return "/images/uludag_ski.jpg";
+        if (city.Contains("fethiye") || name.Contains("lagoon")) return "/images/fethiye_lagoon.jpg";
+        if (city.Contains("mardin") || name.Contains("stone mansion")) return "/images/mardin_mansion.jpg";
+        if (city.Contains("paris") || name.Contains("parisian")) return "/images/paris_palace.jpg";
+        if (city.Contains("londra") || city.Contains("westminster")) return "/images/london_royal.jpg";
+        if (city.Contains("new york") || name.Contains("skyline")) return "/images/newyork_skyline.jpg";
+        if (city.Contains("dubai") || name.Contains("mirage")) return "/images/dubai_resort.jpg";
+        if (city.Contains("tokyo") || name.Contains("sakura")) return "/images/tokyo_palace.jpg";
+        if (city.Contains("roma") || name.Contains("colosseum")) return "/images/rome_palace.jpg";
+        if (city.Contains("bali") || name.Contains("ubud")) return "/images/bali_resort.jpg";
+        if (city.Contains("alpler") || city.Contains("isviçre") || city.Contains("zermatt") || city.Contains("zürih")) return "/images/alps_resort.jpg";
+
+        return "/hero.jpg";
+    }
+
+    string GetHotelHighlight(Hotel h)
+    {
+        var city = (h.City ?? "").ToLowerInvariant();
+        if (city.Contains("bodrum")) return "Denize Sıfır & Özel Kumsal İskele";
+        if (city.Contains("istanbul")) return "Boğaz Manzaralı Tarihi Çırağan Komşusu";
+        if (city.Contains("antalya")) return "Ultra Her Şey Dahil & Su Parkı Plajı";
+        if (city.Contains("kapadokya")) return "Balon Manzaralı Otantik Kaya Mağara";
+        if (city.Contains("çeşme")) return "Taş Konak Mimari & Sörf Plajı";
+        if (city.Contains("uludağ")) return "Ski-in/Ski-out & Termal Spa Keyfi";
+        if (city.Contains("fethiye")) return "Ölüdeniz Lagün & Özel Lüks Villa";
+        if (city.Contains("mardin")) return "Tarihi Taş Konak & Mezopotamya Ovası";
+        if (city.Contains("paris")) return "Eyfel & Şanzelize Yakını Lüks Saray";
+        if (city.Contains("londra")) return "Westminster & Big Ben Yanı Kraliyet Oteli";
+        if (city.Contains("new york")) return "Manhattan Broadway & 5th Ave Manzarası";
+        if (city.Contains("dubai")) return "Özel Marina & Çöl Safarisi Lüksü";
+        if (city.Contains("tokyo")) return "Ginza & İmparatorluk Bahçesi Karşısı";
+        if (city.Contains("roma")) return "Kolezyum Karşısı Tarihi İtalyan Sarayı";
+        if (city.Contains("bali")) return "Özel Havuzlu Tropik Yağmur Ormanı Villası";
+        if (city.Contains("isviçre") || city.Contains("alpler") || city.Contains("zürih")) return "Alp Dağları & Buzul Manzaralı Şale";
+        return "5 Yıldızlı Lüks Deneyim";
+    }
+
+    decimal GetHotelStartingPrice(Hotel h)
+    {
+        var city = (h.City ?? "").ToLowerInvariant();
+        if (city.Contains("bodrum")) return 2400;
+        if (city.Contains("istanbul")) return 3800;
+        if (city.Contains("antalya")) return 3200;
+        if (city.Contains("kapadokya")) return 2900;
+        if (city.Contains("çeşme")) return 2600;
+        if (city.Contains("uludağ")) return 3100;
+        if (city.Contains("fethiye")) return 2800;
+        if (city.Contains("mardin")) return 2200;
+        if (city.Contains("paris")) return 5400;
+        if (city.Contains("londra")) return 5800;
+        if (city.Contains("new york")) return 6200;
+        if (city.Contains("dubai")) return 7500;
+        if (city.Contains("tokyo")) return 4900;
+        if (city.Contains("roma")) return 4600;
+        if (city.Contains("bali")) return 3600;
+        if (city.Contains("isviçre") || city.Contains("alpler") || city.Contains("zürih")) return 6800;
+        return 2400;
+    }
+
+    List<string> GetRoomAmenityTags(RoomType rt, Hotel? h)
+    {
+        var tags = new List<string>();
+        var rName = (rt.Name ?? "").ToLowerInvariant();
+        var hCity = (h?.City ?? "").ToLowerInvariant();
+
+        if (rName.Contains("deniz")) tags.Add("🌊 Panoramik Deniz");
+        if (rName.Contains("suit")) tags.Add("🛁 Mermer Jakuzi");
+        if (rName.Contains("deluxe")) tags.Add("🌅 Özel Balkon");
+        if (rName.Contains("aile")) tags.Add("👨‍👩‍👧 Geniş Oturma Alanı");
+
+        if (hCity.Contains("antalya")) tags.Add("🍹 Minibar Dahil");
+        else if (hCity.Contains("uludağ")) tags.Add("🎿 Kayak Odası");
+        else if (hCity.Contains("paris")) tags.Add("🥐 Nespresso Makinesi");
+        else if (hCity.Contains("kapadokya")) tags.Add("🎈 Balon Seyir Terası");
+        else if (hCity.Contains("isviçre") || hCity.Contains("alpler")) tags.Add("🧀 Fondü İkramı");
+        else if (hCity.Contains("dubai")) tags.Add("🛥️ Özel İskele");
+        else if (hCity.Contains("bali")) tags.Add("🌺 Tropik Bahçe");
+
+        tags.Add("❄️ Klima");
+        tags.Add("📶 Hızlı Wi-Fi");
+        return tags;
+    }
+
+    string GetRoomImage(RoomType rt)
+    {
+        var name = (rt.Name ?? "").ToLowerInvariant();
+        if (name.Contains("deniz") || name.Contains("sea")) return "/images/room_seaview.jpg";
+        if (name.Contains("suit") || name.Contains("suite") || name.Contains("jaku")) return "/images/room_suite.jpg";
+        if (name.Contains("aile") || name.Contains("family")) return "/images/room_family.jpg";
+        if (name.Contains("deluxe") || name.Contains("balkon")) return "/images/room_deluxe.jpg";
+        return "/images/room_standard.jpg";
+    }
+
+    void OpenPhotoModal(RoomType rt)
+    {
+        photoModalRt = rt;
+        showPhotoModal = true;
+    }
+
+    async Task SelectRoomType(RoomType rt)
+    {
+        selectedRt = rt;
+        modalError = null;
+
+        if (rt.Hotel != null)
+        {
+            currentHotel = rt.Hotel;
+            selectedHotelId = rt.HotelId;
+        }
+        else if (hotels.Any(h => h.Id == rt.HotelId))
+        {
+            currentHotel = hotels.First(h => h.Id == rt.HotelId);
+            selectedHotelId = rt.HotelId;
+        }
+
+        if (selectedBoardCode == null)
+        {
+            var defCode = GetHotelDefaultBoardCode(currentHotel);
+            var bObj = boardTypes.FirstOrDefault(b => b.Code == defCode);
+            if (bObj != null) boardTypeId = bObj.Id;
+        }
+
+        await RecalculateSelected();
+        showBookingModal = true;
+    }
+
+    async Task RecalculateSelected()
+    {
+        if (selectedRt != null)
+        {
+            selectedQuote = await Booking.QuoteAsync(selectedRt.Id, checkIn, checkOut, adults, children, boardTypeId, null);
+        }
+    }
+
+    async Task CompleteGuestBooking()
+    {
+        if (string.IsNullOrWhiteSpace(guestFirstName) || string.IsNullOrWhiteSpace(guestLastName))
+        {
+            modalError = "Lütfen adınızı ve soyadınızı girin.";
+            return;
+        }
+        if (string.IsNullOrWhiteSpace(guestPhone))
+        {
+            modalError = "Lütfen telefon numaranızı girin.";
+            return;
+        }
+
+        isSubmitting = true;
+        modalError = null;
+
+        try
+        {
+            var guest = await Db.Guests.FirstOrDefaultAsync(g => g.Email == guestEmail && !string.IsNullOrEmpty(guestEmail));
+            if (guest == null)
+            {
+                guest = new Guest
+                {
+                    FirstName = guestFirstName.Trim(),
+                    LastName = guestLastName.Trim(),
+                    Email = guestEmail.Trim(),
+                    Phone = guestPhone.Trim(),
+                    Nationality = "TR"
+                };
+                if (!string.IsNullOrEmpty(guestDocNo))
+                {
+                    guest.Documents.Add(new GuestDocument { DocType = "TC", DocNumber = guestDocNo.Trim() });
+                }
+                Db.Guests.Add(guest);
+                await Db.SaveChangesAsync();
+            }
+
+            var webChannel = await Db.Channels.FirstOrDefaultAsync(c => c.Code == "WEB");
+
+            var req = new BookingRequest
+            {
+                GuestId = guest.Id,
+                RoomTypeId = selectedRt!.Id,
+                BoardTypeId = boardTypeId,
+                ChannelId = webChannel?.Id,
+                CheckIn = checkIn,
+                CheckOut = checkOut,
+                Adults = adults,
+                Children = children,
+                Notes = bookingNotes,
+                Status = ResStatus.Confirmed
+            };
+
+            bookedReservation = await Booking.CreateAsync(req);
+            showBookingModal = false;
+        }
+        catch (Exception ex)
+        {
+            modalError = ex.Message;
+        }
+        finally
+        {
+            isSubmitting = false;
+        }
+    }
+
+    void ResetForm()
+    {
+        bookedReservation = null;
+        SearchRooms();
+    }
+}

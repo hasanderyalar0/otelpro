@@ -1,0 +1,1319 @@
+/* ===== OtelPro Mobil — Otel Sahibi & Yönetici Mobil Deneyimi ===== */
+
+:root {
+    --m-bg: #090d16;
+    --m-surface: rgba(18, 25, 38, 0.85);
+    --m-surface-border: rgba(255, 255, 255, 0.08);
+    --m-accent: #0ea5e9;
+    --m-accent-grad: linear-gradient(135deg, #0ea5e9, #38bdf8);
+    --m-emerald: #10b981;
+    --m-amber: #f59e0b;
+    --m-rose: #f43f5e;
+    --m-purple: #8b5cf6;
+    --m-text: #f8fafc;
+    --m-muted: #94a3b8;
+}
+
+/* Masaüstünde Simülatör Konteyneri */
+.mobile-simulator-wrapper {
+    min-height: 100vh;
+    background: radial-gradient(circle at 50% 10%, rgba(14, 165, 233, 0.12), transparent 50%),
+                radial-gradient(circle at 90% 90%, rgba(139, 92, 246, 0.1), transparent 50%),
+                #050811;
+    padding: 24px 16px 60px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.sim-toolbar {
+    width: 100%;
+    max-width: 900px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 20px;
+    background: rgba(15, 23, 42, 0.75);
+    backdrop-filter: blur(16px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 16px;
+    margin-bottom: 24px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+    flex-wrap: wrap;
+    gap: 12px;
+}
+
+.sim-brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.sim-brand .badge-tag {
+    background: rgba(14, 165, 233, 0.2);
+    color: #38bdf8;
+    border: 1px solid rgba(14, 165, 233, 0.4);
+    padding: 3px 8px;
+    border-radius: 6px;
+    font-size: 0.72rem;
+    font-weight: 700;
+}
+
+.sim-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.sim-toggle-btn {
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    color: #cbd5e1;
+    padding: 8px 14px;
+    border-radius: 10px;
+    font-size: 0.82rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.sim-toggle-btn.active, .sim-toggle-btn:hover {
+    background: rgba(14, 165, 233, 0.25);
+    border-color: #38bdf8;
+    color: #fff;
+}
+
+/* iPhone 16 Pro Cihaz Çerçevesi */
+.phone-device-frame {
+    width: 412px;
+    height: 860px;
+    background: #000;
+    border-radius: 54px;
+    border: 8px solid #2d3748;
+    box-shadow: 0 25px 60px -15px rgba(0, 0, 0, 0.85),
+                0 0 0 1px rgba(255, 255, 255, 0.1),
+                0 0 35px rgba(14, 165, 233, 0.25);
+    position: relative;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Masaüstü Geniş Ekran Modu */
+.phone-device-frame.full-screen-mode {
+    width: 100%;
+    max-width: 680px;
+    height: 90vh;
+    border-radius: 28px;
+    border-width: 4px;
+}
+
+/* Dynamic Island (Ada) & Status Bar */
+.phone-status-bar {
+    height: 48px;
+    padding: 0 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: transparent;
+    z-index: 50;
+    position: relative;
+    user-select: none;
+}
+
+.phone-time {
+    font-size: 0.88rem;
+    font-weight: 600;
+    color: #fff;
+    letter-spacing: -0.01em;
+}
+
+.dynamic-island {
+    width: 110px;
+    height: 28px;
+    background: #000;
+    border-radius: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 10px;
+    box-shadow: 0 0 1px rgba(255, 255, 255, 0.2);
+}
+
+.island-camera {
+    width: 10px;
+    height: 10px;
+    background: #0f172a;
+    border-radius: 50%;
+    border: 1px solid #1e293b;
+}
+
+.island-sensor {
+    width: 8px;
+    height: 8px;
+    background: #0f172a;
+    border-radius: 50%;
+}
+
+.phone-status-icons {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: #fff;
+    font-size: 0.8rem;
+}
+
+/* Mobil Uygulama İçeriği */
+.phone-screen-content {
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 0 16px 85px 16px;
+    position: relative;
+    scroll-behavior: smooth;
+    -webkit-overflow-scrolling: touch;
+}
+
+/* Mobilde Üst Header */
+.mobile-app-header {
+    padding: 8px 0 16px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky;
+    top: 0;
+    background: rgba(9, 13, 22, 0.92);
+    backdrop-filter: blur(20px);
+    z-index: 30;
+    margin-bottom: 8px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.mobile-hotel-picker-btn {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    padding: 6px 12px;
+    border-radius: 20px;
+    cursor: pointer;
+    max-width: 250px;
+}
+
+.mobile-hotel-picker-btn .hotel-name {
+    font-size: 0.86rem;
+    font-weight: 700;
+    color: #fff;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.mobile-hotel-picker-btn .chevron {
+    color: var(--m-muted);
+    font-size: 0.72rem;
+}
+
+.mobile-head-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.mobile-icon-btn {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.07);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: #fff;
+    display: grid;
+    place-items: center;
+    position: relative;
+    cursor: pointer;
+    font-size: 1rem;
+    transition: 0.2s;
+}
+
+.mobile-icon-btn:hover {
+    background: rgba(14, 165, 233, 0.2);
+    border-color: #38bdf8;
+}
+
+.badge-dot {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    width: 8px;
+    height: 8px;
+    background: #f43f5e;
+    border-radius: 50%;
+    box-shadow: 0 0 6px #f43f5e;
+}
+
+/* Günün Özeti Banner */
+.mobile-summary-banner {
+    background: linear-gradient(135deg, rgba(14, 165, 233, 0.2), rgba(139, 92, 246, 0.15));
+    border: 1px solid rgba(14, 165, 233, 0.3);
+    border-radius: 20px;
+    padding: 18px;
+    margin-bottom: 16px;
+    position: relative;
+    overflow: hidden;
+}
+
+.banner-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 12px;
+}
+
+.banner-kicker {
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    color: #38bdf8;
+    text-transform: uppercase;
+}
+
+.banner-title {
+    font-size: 1.15rem;
+    font-weight: 800;
+    color: #fff;
+    margin: 2px 0 0;
+}
+
+.live-indicator {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(16, 185, 129, 0.15);
+    border: 1px solid rgba(16, 185, 129, 0.3);
+    color: #34d399;
+    padding: 3px 8px;
+    border-radius: 12px;
+    font-size: 0.7rem;
+    font-weight: 700;
+}
+
+.live-indicator-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #34d399;
+    animation: pulse 1.5s infinite;
+}
+
+/* Doluluk Çemberi & Flash Rakamlar */
+.banner-metrics-row {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+
+.occ-circle-wrap {
+    width: 72px;
+    height: 72px;
+    position: relative;
+    display: grid;
+    place-items: center;
+}
+
+.occ-circle-wrap svg {
+    transform: rotate(-90deg);
+}
+
+.occ-circle-val {
+    position: absolute;
+    font-size: 0.95rem;
+    font-weight: 800;
+    color: #fff;
+}
+
+.metrics-text-col {
+    flex: 1;
+}
+
+.metrics-revenue-big {
+    font-size: 1.45rem;
+    font-weight: 800;
+    color: #fff;
+    line-height: 1.1;
+}
+
+.metrics-sub {
+    font-size: 0.75rem;
+    color: var(--m-muted);
+    margin-top: 4px;
+}
+
+/* 2'li Hızlı Kartlar Grid */
+.mobile-grid-2 {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+    margin-bottom: 16px;
+}
+
+.mobile-stat-card {
+    background: var(--m-surface);
+    border: 1px solid var(--m-surface-border);
+    border-radius: 18px;
+    padding: 14px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    transition: transform 0.2s;
+}
+
+.mobile-stat-card:active {
+    transform: scale(0.98);
+}
+
+.card-header-icon {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 8px;
+}
+
+.card-icon {
+    font-size: 1.25rem;
+}
+
+.card-label {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--m-muted);
+}
+
+.card-val {
+    font-size: 1.35rem;
+    font-weight: 800;
+    color: #fff;
+    margin-top: 2px;
+}
+
+.card-foot {
+    font-size: 0.72rem;
+    margin-top: 4px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+/* Bölüm Başlığı */
+.mobile-sec-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin: 18px 0 10px;
+}
+
+.mobile-sec-head h3 {
+    font-size: 0.92rem;
+    font-weight: 700;
+    color: #f1f5f9;
+    letter-spacing: -0.01em;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.mobile-sec-head a, .mobile-sec-head button {
+    font-size: 0.76rem;
+    color: var(--m-accent);
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    font-weight: 600;
+}
+
+/* Misafir Listesi Kartları */
+.guest-arrival-card {
+    background: var(--m-surface);
+    border: 1px solid var(--m-surface-border);
+    border-radius: 16px;
+    padding: 14px;
+    margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.guest-info-block {
+    flex: 1;
+    min-width: 0;
+}
+
+.guest-name-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.guest-name-row b {
+    font-size: 0.88rem;
+    color: #fff;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.guest-details-meta {
+    font-size: 0.75rem;
+    color: var(--m-muted);
+    margin-top: 2px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.guest-contact-actions {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.btn-contact {
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+    display: grid;
+    place-items: center;
+    font-size: 1.05rem;
+    text-decoration: none;
+    border: 1px solid transparent;
+    transition: 0.2s;
+}
+
+.btn-contact.phone {
+    background: rgba(14, 165, 233, 0.15);
+    border-color: rgba(14, 165, 233, 0.3);
+    color: #38bdf8;
+}
+
+.btn-contact.whatsapp {
+    background: rgba(34, 197, 94, 0.15);
+    border-color: rgba(34, 197, 94, 0.3);
+    color: #4ade80;
+}
+
+/* Mini Oda Durumu Izgarası */
+.mini-room-rack-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+    margin-bottom: 14px;
+}
+
+.mini-room-pill {
+    background: var(--m-surface);
+    border: 1px solid var(--m-surface-border);
+    border-radius: 12px;
+    padding: 10px 6px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.mini-room-pill.clean {
+    border-color: rgba(16, 185, 129, 0.35);
+    background: rgba(16, 185, 129, 0.08);
+}
+
+.mini-room-pill.dirty {
+    border-color: rgba(244, 63, 94, 0.35);
+    background: rgba(244, 63, 94, 0.08);
+}
+
+.mini-room-pill.occupied {
+    border-color: rgba(14, 165, 233, 0.45);
+    background: rgba(14, 165, 233, 0.15);
+}
+
+.mini-room-pill b {
+    display: block;
+    font-size: 0.95rem;
+    color: #fff;
+}
+
+.mini-room-pill small {
+    display: block;
+    font-size: 0.68rem;
+    margin-top: 2px;
+}
+
+/* Hızlı İşlem Düğmeleri */
+.quick-actions-bar {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+    margin-bottom: 16px;
+}
+
+.quick-action-card {
+    background: var(--m-surface);
+    border: 1px solid var(--m-surface-border);
+    border-radius: 14px;
+    padding: 12px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.quick-action-card:hover, .quick-action-card:active {
+    background: rgba(14, 165, 233, 0.15);
+    border-color: #38bdf8;
+    transform: translateY(-2px);
+}
+
+.quick-action-card .qa-icon {
+    font-size: 1.4rem;
+}
+
+.quick-action-card .qa-title {
+    font-size: 0.82rem;
+    font-weight: 700;
+    color: #fff;
+}
+
+.quick-action-card .qa-desc {
+    font-size: 0.68rem;
+    color: var(--m-muted);
+}
+
+/* Sabit Alt Bar (iOS / Android Bottom Nav Dock) */
+.phone-bottom-nav {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 72px;
+    background: rgba(11, 15, 25, 0.88);
+    backdrop-filter: blur(24px);
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+    display: flex;
+    align-items: center;
+    justify-content: space-around;
+    padding: 0 10px 14px;
+    z-index: 40;
+}
+
+.bottom-tab-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 3px;
+    color: var(--m-muted);
+    background: transparent;
+    border: none;
+    font-size: 0.68rem;
+    font-weight: 600;
+    cursor: pointer;
+    padding: 6px 12px;
+    position: relative;
+    transition: 0.18s;
+}
+
+.bottom-tab-item .tab-icon {
+    font-size: 1.25rem;
+    transition: transform 0.2s;
+}
+
+.bottom-tab-item.active {
+    color: #38bdf8;
+}
+
+.bottom-tab-item.active .tab-icon {
+    transform: translateY(-2px);
+}
+
+.bottom-tab-item .tab-badge {
+    position: absolute;
+    top: 2px;
+    right: 6px;
+    background: #f43f5e;
+    color: #fff;
+    font-size: 0.62rem;
+    font-weight: 700;
+    padding: 1px 5px;
+    border-radius: 999px;
+}
+
+/* Ortada Parlayan FAB İşlem Düğmesi */
+.fab-center-btn {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #0ea5e9, #6366f1);
+    color: #fff;
+    border: none;
+    display: grid;
+    place-items: center;
+    font-size: 1.4rem;
+    box-shadow: 0 4px 18px rgba(14, 165, 233, 0.5);
+    margin-top: -16px;
+    cursor: pointer;
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.fab-center-btn:hover {
+    transform: scale(1.08);
+    box-shadow: 0 6px 22px rgba(14, 165, 233, 0.7);
+}
+
+/* Home Indicator Çubuğu (iPhone Alt Çizgi) */
+.home-indicator-bar {
+    position: absolute;
+    bottom: 6px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 130px;
+    height: 4px;
+    background: rgba(255, 255, 255, 0.35);
+    border-radius: 4px;
+    pointer-events: none;
+    z-index: 45;
+}
+
+/* Slide-Up Bottom Sheet Modal */
+.mobile-bottom-sheet {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: #0f172a;
+    border-top: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 28px 28px 0 0;
+    padding: 12px 18px 36px;
+    z-index: 60;
+    box-shadow: 0 -15px 40px rgba(0, 0, 0, 0.8);
+    animation: sheetSlideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes sheetSlideUp {
+    from { transform: translateY(100%); }
+    to { transform: translateY(0); }
+}
+
+.sheet-handle {
+    width: 40px;
+    height: 5px;
+    background: rgba(255, 255, 255, 0.25);
+    border-radius: 4px;
+    margin: 4px auto 14px;
+}
+
+.sheet-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 16px;
+}
+
+.sheet-header h4 {
+    margin: 0;
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: #fff;
+}
+
+.sheet-header .close-btn {
+    background: rgba(255, 255, 255, 0.1);
+    border: none;
+    color: #cbd5e1;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    cursor: pointer;
+}
+
+/* ================= AYLIK ÇİZELGE & ODA TAKVİMİ STİLLERİ ================= */
+
+/* Dashboard Takvim Kısayolu */
+.mobile-cal-shortcut-card {
+    background: linear-gradient(135deg, rgba(14, 165, 233, 0.14), rgba(99, 102, 241, 0.14));
+    border: 1px solid rgba(56, 189, 248, 0.35);
+    border-radius: 16px;
+    padding: 12px 14px;
+    margin-bottom: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.mobile-cal-shortcut-card:hover, .mobile-cal-shortcut-card:active {
+    background: linear-gradient(135deg, rgba(14, 165, 233, 0.25), rgba(99, 102, 241, 0.25));
+    border-color: #38bdf8;
+    transform: translateY(-1px);
+}
+
+.cal-mini-icon {
+    width: 38px;
+    height: 42px;
+    background: #0f172a;
+    border: 1px solid rgba(56, 189, 248, 0.5);
+    border-radius: 8px;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    text-align: center;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.4);
+}
+
+.cal-month-tag {
+    background: #0284c7;
+    color: #fff;
+    font-size: 0.58rem;
+    font-weight: 800;
+    padding: 1px 0;
+    letter-spacing: 0.05em;
+}
+
+.cal-day-tag {
+    color: #f8fafc;
+    font-size: 0.95rem;
+    font-weight: 800;
+    line-height: 1.4;
+}
+
+/* Ay Gezinme Çubuğu (Month Navigation) */
+.mobile-cal-nav {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: var(--m-surface);
+    border: 1px solid var(--m-surface-border);
+    border-radius: 16px;
+    padding: 8px 12px;
+    margin-bottom: 12px;
+}
+
+.cal-nav-btn {
+    width: 34px;
+    height: 34px;
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: #f8fafc;
+    display: grid;
+    place-items: center;
+    cursor: pointer;
+    font-size: 0.85rem;
+    transition: all 0.2s;
+}
+
+.cal-nav-btn:hover, .cal-nav-btn:active {
+    background: rgba(14, 165, 233, 0.25);
+    border-color: #38bdf8;
+    color: #38bdf8;
+}
+
+.cal-nav-center {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+}
+
+.cal-nav-month-title {
+    font-size: 0.95rem;
+    font-weight: 800;
+    color: #fff;
+    letter-spacing: -0.01em;
+}
+
+.cal-today-pill {
+    background: rgba(14, 165, 233, 0.15);
+    border: 1px solid rgba(14, 165, 233, 0.35);
+    color: #38bdf8;
+    font-size: 0.65rem;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 999px;
+    cursor: pointer;
+    transition: 0.2s;
+}
+
+.cal-today-pill:hover {
+    background: #0284c7;
+    color: #fff;
+}
+
+/* Aylık KPI Strip */
+.mobile-cal-kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 6px;
+    margin-bottom: 12px;
+}
+
+.cal-kpi-item {
+    background: var(--m-surface);
+    border: 1px solid var(--m-surface-border);
+    border-radius: 12px;
+    padding: 8px 4px;
+    text-align: center;
+}
+
+.cal-kpi-val {
+    font-size: 0.92rem;
+    font-weight: 800;
+    color: #fff;
+    line-height: 1.1;
+}
+
+.cal-kpi-label {
+    font-size: 0.62rem;
+    color: var(--m-muted);
+    margin-top: 2px;
+    white-space: nowrap;
+}
+
+/* Görünüm Segment Kontrolü (Pill Switcher) */
+.mobile-view-tabs {
+    display: flex;
+    background: rgba(15, 23, 42, 0.7);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 12px;
+    padding: 3px;
+    margin-bottom: 12px;
+    gap: 4px;
+}
+
+.mobile-view-tab-btn {
+    flex: 1;
+    background: transparent;
+    border: none;
+    color: var(--m-muted);
+    font-size: 0.74rem;
+    font-weight: 600;
+    padding: 7px 4px;
+    border-radius: 9px;
+    cursor: pointer;
+    transition: all 0.2s;
+    text-align: center;
+}
+
+.mobile-view-tab-btn.active {
+    background: rgba(14, 165, 233, 0.25);
+    color: #38bdf8;
+    border: 1px solid rgba(56, 189, 248, 0.4);
+    font-weight: 700;
+}
+
+/* 7 Sütunlu Aylık Doluluk Matrisi */
+.mobile-month-calendar-box {
+    background: var(--m-surface);
+    border: 1px solid var(--m-surface-border);
+    border-radius: 18px;
+    padding: 10px;
+    margin-bottom: 14px;
+}
+
+.cal-dow-row {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    text-align: center;
+    margin-bottom: 6px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    padding-bottom: 6px;
+}
+
+.cal-dow-cell {
+    font-size: 0.66rem;
+    font-weight: 700;
+    color: var(--m-muted);
+}
+
+.cal-dow-cell.weekend {
+    color: #f59e0b;
+}
+
+.cal-days-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 4px;
+}
+
+.mobile-day-cell {
+    min-height: 52px;
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    border-radius: 10px;
+    padding: 4px 2px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: space-between;
+    cursor: pointer;
+    transition: all 0.15s;
+    position: relative;
+}
+
+.mobile-day-cell:hover, .mobile-day-cell:active {
+    background: rgba(14, 165, 233, 0.12);
+    border-color: rgba(56, 189, 248, 0.4);
+}
+
+.mobile-day-cell.today {
+    border-color: #38bdf8;
+    background: rgba(14, 165, 233, 0.08);
+}
+
+.mobile-day-cell.today .day-num {
+    color: #38bdf8;
+    font-weight: 800;
+}
+
+.mobile-day-cell.selected {
+    border: 2px solid #38bdf8 !important;
+    background: rgba(14, 165, 233, 0.22) !important;
+    box-shadow: 0 0 12px rgba(14, 165, 233, 0.45);
+    transform: scale(1.02);
+    z-index: 2;
+}
+
+.mobile-day-cell.empty {
+    visibility: hidden;
+    pointer-events: none;
+}
+
+.day-num {
+    font-size: 0.76rem;
+    font-weight: 600;
+    color: #cbd5e1;
+    line-height: 1;
+}
+
+.day-occ-pill {
+    font-size: 0.6rem;
+    font-weight: 800;
+    padding: 1px 4px;
+    border-radius: 6px;
+    line-height: 1.1;
+}
+
+.day-occ-pill.high {
+    background: rgba(16, 185, 129, 0.22);
+    color: #34d399;
+    border: 1px solid rgba(16, 185, 129, 0.4);
+}
+
+.day-occ-pill.med {
+    background: rgba(14, 165, 233, 0.2);
+    color: #38bdf8;
+    border: 1px solid rgba(14, 165, 233, 0.35);
+}
+
+.day-occ-pill.low {
+    background: rgba(245, 158, 11, 0.15);
+    color: #fbbf24;
+    border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+.day-occ-pill.empty {
+    background: rgba(255, 255, 255, 0.05);
+    color: #64748b;
+}
+
+.day-dots-row {
+    display: flex;
+    gap: 3px;
+    align-items: center;
+    height: 6px;
+}
+
+.dot-indicator {
+    width: 4px;
+    height: 4px;
+    border-radius: 50%;
+}
+
+.dot-indicator.arrival {
+    background: #38bdf8;
+    box-shadow: 0 0 4px #38bdf8;
+}
+
+.dot-indicator.departure {
+    background: #f59e0b;
+    box-shadow: 0 0 4px #f59e0b;
+}
+
+/* Tape Chart (Gantt Oda Çizelgesi) */
+.mobile-tape-wrapper {
+    background: var(--m-surface);
+    border: 1px solid var(--m-surface-border);
+    border-radius: 18px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    margin-bottom: 14px;
+    -webkit-overflow-scrolling: touch;
+}
+
+.mobile-tape-table {
+    display: grid;
+    min-width: 820px;
+}
+
+.tape-row {
+    display: flex;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.tape-row.header {
+    background: rgba(15, 23, 42, 0.95);
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.tape-room-col {
+    width: 90px;
+    min-width: 90px;
+    position: sticky;
+    left: 0;
+    background: #0f172a;
+    border-right: 1px solid rgba(255, 255, 255, 0.1);
+    padding: 8px 6px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    z-index: 5;
+}
+
+.tape-room-num {
+    font-size: 0.84rem;
+    font-weight: 800;
+    color: #fff;
+    line-height: 1;
+}
+
+.tape-room-type {
+    font-size: 0.62rem;
+    color: var(--m-muted);
+    margin-top: 2px;
+}
+
+.tape-day-cell {
+    width: 28px;
+    min-width: 28px;
+    height: 38px;
+    border-right: 1px solid rgba(255, 255, 255, 0.04);
+    display: grid;
+    place-items: center;
+    font-size: 0.68rem;
+    position: relative;
+}
+
+.tape-day-cell.weekend {
+    background: rgba(245, 158, 11, 0.04);
+}
+
+.tape-day-cell.today {
+    background: rgba(14, 165, 233, 0.12);
+}
+
+.tape-day-cell.selected {
+    background: rgba(14, 165, 233, 0.22);
+}
+
+.tape-res-bar {
+    position: absolute;
+    top: 5px;
+    bottom: 5px;
+    left: 1px;
+    right: 1px;
+    border-radius: 6px;
+    padding: 2px 4px;
+    font-size: 0.6rem;
+    font-weight: 700;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+    z-index: 3;
+    transition: transform 0.1s;
+}
+
+.tape-res-bar:hover {
+    transform: scale(1.05);
+    z-index: 6;
+}
+
+.tape-res-bar.status-Confirmed {
+    background: linear-gradient(135deg, #0284c7, #0ea5e9);
+    color: #fff;
+    border: 1px solid #38bdf8;
+}
+
+.tape-res-bar.status-CheckedIn {
+    background: linear-gradient(135deg, #059669, #10b981);
+    color: #fff;
+    border: 1px solid #34d399;
+}
+
+.tape-res-bar.status-CheckedOut {
+    background: #334155;
+    color: #cbd5e1;
+    border: 1px solid #475569;
+}
+
+/* Seçili Gün Detay Paneli */
+.mobile-day-detail-panel {
+    background: var(--m-surface);
+    border: 1px solid var(--m-surface-border);
+    border-radius: 20px;
+    padding: 14px;
+    margin-bottom: 20px;
+}
+
+.day-detail-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 10px;
+}
+
+.day-detail-date-title {
+    font-size: 0.95rem;
+    font-weight: 800;
+    color: #fff;
+}
+
+.day-detail-occ-badge {
+    font-size: 0.72rem;
+    font-weight: 700;
+    padding: 3px 8px;
+    border-radius: 8px;
+}
+
+.mobile-filter-chips {
+    display: flex;
+    gap: 6px;
+    overflow-x: auto;
+    padding-bottom: 8px;
+    margin-bottom: 12px;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+}
+
+.filter-chip-btn {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: #cbd5e1;
+    font-size: 0.72rem;
+    font-weight: 600;
+    padding: 5px 10px;
+    border-radius: 20px;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.filter-chip-btn.active {
+    background: rgba(14, 165, 233, 0.25);
+    border-color: #38bdf8;
+    color: #fff;
+    font-weight: 700;
+}
+
+.mobile-room-res-card {
+    background: rgba(15, 23, 42, 0.6);
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    border-radius: 14px;
+    padding: 12px;
+    margin-bottom: 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    transition: 0.2s;
+}
+
+.mobile-room-res-card:hover {
+    border-color: rgba(56, 189, 248, 0.4);
+}
+
+.room-card-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.room-card-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.room-card-num {
+    font-size: 0.92rem;
+    font-weight: 800;
+    color: #fff;
+}
+
+.room-card-type-sub {
+    font-size: 0.7rem;
+    color: var(--m-muted);
+}
+
+.room-card-body {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: rgba(255, 255, 255, 0.02);
+    border-radius: 10px;
+    padding: 8px 10px;
+}
+
+.room-guest-meta {
+    font-size: 0.75rem;
+    color: #e2e8f0;
+}
+
+.room-card-actions {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    justify-content: flex-end;
+}
+
+/* Doğrudan Mobil Cihazda Açıldığında (< 768px) Tam Ekran */
+@media (max-width: 768px) {
+    .mobile-simulator-wrapper {
+        padding: 0;
+        background: #000;
+    }
+    .sim-toolbar {
+        display: none !important;
+    }
+    .phone-device-frame {
+        width: 100vw !important;
+        height: 100vh !important;
+        border: none !important;
+        border-radius: 0 !important;
+        box-shadow: none !important;
+    }
+    .phone-status-bar {
+        padding-top: env(safe-area-inset-top, 8px);
+    }
+    .phone-bottom-nav {
+        padding-bottom: calc(env(safe-area-inset-bottom, 10px) + 8px);
+    }
+}

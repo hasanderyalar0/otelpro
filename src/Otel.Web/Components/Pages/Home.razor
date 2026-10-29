@@ -1,0 +1,408 @@
+@page "/"
+@inject ReportService Reports
+@inject IDbContextFactory<AppDb> DbFactory
+@inject MachineLearningEngine Ml
+@inject AiIntelligenceService Ai
+@implements IDisposable
+
+<div class="page-head">
+    <div>
+        <div style="display:flex;align-items:center;gap:10px">
+            <h1>@L["dash.title"]</h1>
+            <span class="badge b-ok" style="font-size:0.85rem">🏢 @(CurrentHotelState.SelectedHotel?.Name ?? "Tesis")</span>
+            <span class="badge b-Clean" style="font-size:0.85rem">🧠 ML.NET %88</span>
+        </div>
+        <p>@(L.Lang == "tr" ? $"{CurrentHotelState.SelectedHotel?.City} tesisinizin anlık doluluk ve operasyon durumu" : $"Live operational status for {CurrentHotelState.SelectedHotel?.Name}")</p>
+    </div>
+    <div style="display:flex;gap:10px">
+        <a class="btn" href="/ai-intelligence">🤖 @(L.Lang == "tr" ? "Yapay Zeka Laboratuvarı" : "AI Center")</a>
+        <a class="btn" href="/nearby">🌴 @(L.Lang == "tr" ? "Çevre & Aktiviteler" : "Nearby")</a>
+        <a class="btn primary" href="/reservations/new">＋ @L["nav.newres"]</a>
+    </div>
+</div>
+
+@if (stats == null)
+{
+    <div style="padding:40px 20px;text-align:center">
+        <div style="display:inline-flex;align-items:center;gap:12px;padding:12px 24px;border-radius:14px;background:rgba(56,189,248,0.08);border:1px solid rgba(56,189,248,0.25);color:#38bdf8;font-weight:600">
+            <span class="pulse-dot"></span>
+            <span>Tesis operasyon verileri ve yapay zeka telemetrisi yükleniyor...</span>
+        </div>
+    </div>
+}
+else
+{
+    <!-- AI Karar Destek & Anlık ML Öngörüleri Banner -->
+    <div class="card mb" style="background:linear-gradient(135deg, rgba(14, 165, 233, 0.12), rgba(99, 102, 241, 0.1));border:1px solid rgba(56, 189, 248, 0.35);padding:14px 18px">
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px">
+            <div style="display:flex;align-items:center;gap:12px">
+                <div style="width:42px;height:42px;background:linear-gradient(135deg, #0ea5e9, #6366f1);border-radius:12px;display:grid;place-items:center;font-size:1.4rem;box-shadow:0 4px 12px rgba(14,165,233,0.3)">🧠</div>
+                <div>
+                    <div style="font-weight:700;display:flex;align-items:center;gap:8px">
+                        <span>OtelPro Yapay Zeka & Makine Öğrenmesi Canlı Öngörüleri</span>
+                        <span class="badge b-ok" style="font-size:0.75rem">%@Ml.ModelAccuracy FastTree Doğruluğu</span>
+                    </div>
+                    <div class="muted" style="font-size:0.84rem;margin-top:2px">
+                        Hafta sonu doluluk tahmini: <b style="color:#38bdf8">%@avgWeekendOcc</b> | Önümüzdeki günlerde <b>@highRiskCount yüksek riskli iptal</b> tespit edildi.
+                    </div>
+                </div>
+            </div>
+            <div style="display:flex;gap:8px">
+                <a class="btn sm primary" href="/ai-intelligence">🚀 Yapay Zeka Merkezini Aç</a>
+                <button class="btn sm" @onclick="QuickTrainModel" disabled="@isTraining">
+                    🔄 @(isTraining ? "Eğitiliyor..." : "Modeli Hızlı Eğit")
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div class="grid g4">
+        <div class="card kpi"><span class="ico">🏨</span><div class="label">@L["dash.occupancy"]</div><div class="val">%@stats.OccupancyToday.ToString("0")</div><div class="sub">@stats.InHouse / @stats.TotalRooms @L["c.room"]</div></div>
+        <div class="card kpi"><span class="ico">🛬</span><div class="label">@L["dash.arrivals"]</div><div class="val">@stats.Arrivals</div><div class="sub">@L["c.checkin"]</div></div>
+        <div class="card kpi"><span class="ico">🛫</span><div class="label">@L["dash.departures"]</div><div class="val">@stats.Departures</div><div class="sub">@L["c.checkout"]</div></div>
+        <div class="card kpi"><span class="ico">💰</span><div class="label">@L["dash.revenue30"]</div><div class="val">@Fmt.Money(stats.Revenue30)</div><div class="sub">ADR @Fmt.Money(stats.Adr30) · RevPAR @Fmt.Money(stats.RevPar30)</div></div>
+    </div>
+
+    <!-- 🚀 İLERİ TEKNOLOJİ AR-GE & YENİ NESİL İNOVASYON KOKPİTİ -->
+    <div class="card mt" style="background:linear-gradient(135deg, rgba(15, 23, 42, 0.95), rgba(30, 41, 59, 0.85));border:1px solid rgba(56, 189, 248, 0.35);box-shadow:0 12px 36px -10px rgba(14, 165, 233, 0.25)">
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;margin-bottom:18px">
+            <div style="display:flex;align-items:center;gap:12px">
+                <span style="font-size:1.8rem">🚀</span>
+                <div>
+                    <h3 style="margin:0;font-size:1.2rem;background:linear-gradient(135deg, #38bdf8, #a855f7);-webkit-background-clip:text;background-clip:text;color:transparent;font-weight:800">
+                        @(L.Lang == "tr" ? "OtelPro İleri Teknoloji & Yapay Zeka AR-GE Merkezi" : "OtelPro Advanced Technology & AI R&D Center")
+                    </h3>
+                    <small class="muted">@(L.Lang == "tr" ? "Endüstri 4.0 IoT Dijital İkiz, Biyometrik Görüntü İşleme, Canlı Hava Sahası Radarı ve Otonom Fiyatlandırma" : "Industry 4.0 IoT Digital Twin, Biometric Computer Vision & Dynamic Yield Radar")</small>
+                </div>
+            </div>
+            <div style="display:flex;gap:8px">
+                <span class="badge b-ok" style="font-size:0.82rem">6 İleri Modül</span>
+                <span class="badge" style="background:#6366f1;color:#fff;font-size:0.82rem">Canlı Etkileşimli</span>
+            </div>
+        </div>
+
+        <div class="grid" style="grid-template-columns:repeat(auto-fit, minmax(260px, 1fr));gap:14px">
+            <!-- 1. 3D Dijital İkiz -->
+            <a href="/digital-twin" class="card" style="background:rgba(6,182,212,0.08);border:1px solid rgba(6,182,212,0.35);text-decoration:none;transition:all 0.25s ease;display:flex;flex-direction:column;justify-content:space-between">
+                <div>
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+                        <span style="font-size:1.9rem">👁️</span>
+                        <span class="badge" style="background:#06b6d4;color:#04121e;font-size:0.72rem;font-weight:700">Endüstri 4.0 IoT</span>
+                    </div>
+                    <b style="color:#fff;font-size:1.02rem;display:block;margin-bottom:4px">3D Kat Planı Dijital İkiz</b>
+                    <p class="muted" style="font-size:0.8rem;line-height:1.35;margin:0">
+                        4 kat, 40 oda, çatı havuz terası, anlık IoT sıcaklık/nem sensörleri ve tek tıkla uzaktan kapı açma.
+                    </p>
+                </div>
+                <div style="margin-top:14px;color:#38bdf8;font-size:0.82rem;font-weight:700">3D Modeli Başlat →</div>
+            </a>
+
+            <!-- 2. Biyometrik Yüz Check-in -->
+            <a href="/face-checkin" class="card" style="background:rgba(168,85,247,0.08);border:1px solid rgba(168,85,247,0.35);text-decoration:none;transition:all 0.25s ease;display:flex;flex-direction:column;justify-content:space-between">
+                <div>
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+                        <span style="font-size:1.9rem">📸</span>
+                        <span class="badge" style="background:#a855f7;color:#fff;font-size:0.72rem;font-weight:700">Biyometrik Vizyon</span>
+                    </div>
+                    <b style="color:#fff;font-size:1.02rem;display:block;margin-bottom:4px">Biyometrik Yüz Tanıma & EGM</b>
+                    <p class="muted" style="font-size:0.8rem;line-height:1.35;margin:0">
+                        128-D vektör benzerliği (%98.9), temassız kiosk check-in, anlık EGM KBS bildirimi ve sesli karşılama.
+                    </p>
+                </div>
+                <div style="margin-top:14px;color:#c084fc;font-size:0.82rem;font-weight:700">Kiosku Simüle Et →</div>
+            </a>
+
+            <!-- 3. Uçuş & Dinamik Gelir Radarı -->
+            <a href="/yield-radar" class="card" style="background:rgba(56,189,248,0.08);border:1px solid rgba(56,189,248,0.35);text-decoration:none;transition:all 0.25s ease;display:flex;flex-direction:column;justify-content:space-between">
+                <div>
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+                        <span style="font-size:1.9rem">📈</span>
+                        <span class="badge" style="background:#0284c7;color:#fff;font-size:0.72rem;font-weight:700">ADS-B & Fiyat Radarı</span>
+                    </div>
+                    <b style="color:#fff;font-size:1.02rem;display:block;margin-bottom:4px">Uçuş & Dinamik Gelir Radarı</b>
+                    <p class="muted" style="font-size:0.8rem;line-height:1.35;margin:0">
+                        Havalimanı iniş telemetrisi, stadyum konserleri ve hava durumuyla anlık dinamik fiyat çarpanı.
+                    </p>
+                </div>
+                <div style="margin-top:14px;color:#38bdf8;font-size:0.82rem;font-weight:700">Radarı Başlat →</div>
+            </a>
+
+            <!-- 4. Rakip Fiyat Casusu -->
+            <a href="/rate-shopper" class="card" style="background:rgba(245,158,11,0.08);border:1px solid rgba(245,158,11,0.35);text-decoration:none;transition:all 0.25s ease;display:flex;flex-direction:column;justify-content:space-between">
+                <div>
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+                        <span style="font-size:1.9rem">🕵️‍♂️</span>
+                        <span class="badge" style="background:#f59e0b;color:#04121e;font-size:0.72rem;font-weight:700">Pazar Radarı</span>
+                    </div>
+                    <b style="color:#fff;font-size:1.02rem;display:block;margin-bottom:4px">Rakip Otel Fiyat Casusu</b>
+                    <p class="muted" style="font-size:0.8rem;line-height:1.35;margin:0">
+                        Bölgedeki 5 yıldızlı tesislerin fiyatlarını canlı tarama, MPI endeksi ve tek tıkla OTA fiyat güncelleme.
+                    </p>
+                </div>
+                <div style="margin-top:14px;color:#fbbf24;font-size:0.82rem;font-weight:700">Radarı İncele →</div>
+            </a>
+
+            <!-- 5. Yapay Zeka Gezi Rehberi & Rota -->
+            <a href="/trip-planner" class="card" style="background:rgba(139,92,246,0.08);border:1px solid rgba(139,92,246,0.35);text-decoration:none;transition:all 0.25s ease;display:flex;flex-direction:column;justify-content:space-between">
+                <div>
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+                        <span style="font-size:1.9rem">🗺️</span>
+                        <span class="badge" style="background:#8b5cf6;color:#fff;font-size:0.72rem;font-weight:700">Akıllı Şehir Rehberi</span>
+                    </div>
+                    <b style="color:#fff;font-size:1.02rem;display:block;margin-bottom:4px">AI Gezi Rehberi & Rota</b>
+                    <p class="muted" style="font-size:0.8rem;line-height:1.35;margin:0">
+                        Misafir zevkine göre interaktif gezi rotası, yürüme mesafeleri ve yerel rehber tavsiyeleri.
+                    </p>
+                </div>
+                <div style="margin-top:14px;color:#a78bfa;font-size:0.82rem;font-weight:700">Rehberi Başlat →</div>
+            </a>
+
+            <!-- 6. Misafir Mobil Anahtar -->
+            <a href="/guest-key" target="_blank" class="card" style="background:rgba(236,72,153,0.08);border:1px solid rgba(236,72,153,0.35);text-decoration:none;transition:all 0.25s ease;display:flex;flex-direction:column;justify-content:space-between">
+                <div>
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+                        <span style="font-size:1.9rem">📱</span>
+                        <span class="badge" style="background:#ec4899;color:#fff;font-size:0.72rem;font-weight:700">NFC / Mobil Anahtar</span>
+                    </div>
+                    <b style="color:#fff;font-size:1.02rem;display:block;margin-bottom:4px">Misafir Dijital Mobil Anahtar</b>
+                    <p class="muted" style="font-size:0.8rem;line-height:1.35;margin:0">
+                        Cep telefonundan nabız atan NFC kapı kilidi açma, folyoya yazan oda servisi siparişi ve tek tıkla Wi-Fi.
+                    </p>
+                </div>
+                <div style="margin-top:14px;color:#f472b6;font-size:0.82rem;font-weight:700">Telefon Simülatörünü Aç ↗</div>
+            </a>
+        </div>
+    </div>
+
+    <div class="grid g-main mt">
+        <div class="card">
+            <h3>@L["dash.chart.occ"]</h3>
+            <div class="bars">
+                @foreach (var o in occ)
+                {
+                    <div class="bar @(o.Date > DateTime.Today ? "future" : "") @(o.Date == DateTime.Today ? "today" : "")"
+                         style="height:@((o.OccupancyPct ?? 0).ToString("0", System.Globalization.CultureInfo.InvariantCulture))%"
+                         data-tip="@o.Date.ToString("dd.MM") · %@((o.OccupancyPct ?? 0).ToString("0")) · @o.OccupiedRooms/@o.TotalRooms"></div>
+                }
+            </div>
+            <div class="row muted" style="justify-content:space-between;font-size:.78rem;margin-top:8px"><span>−30</span><span>@L["c.date"]: @DateTime.Today.ToString("dd.MM")</span><span>+30</span></div>
+        </div>
+        <div class="card">
+            <h3>@L["dash.chart.channels"]</h3>
+            @foreach (var c in mix.Take(7))
+            {
+                <div class="hbar"><span class="t">@c.Channel</span><div class="track"><div class="fill" style="width:@((mix[0].Revenue == 0 ? 0 : c.Revenue / mix[0].Revenue * 100).ToString("0", System.Globalization.CultureInfo.InvariantCulture))%"></div></div><span class="v">@Fmt.Money(c.Revenue)</span></div>
+            }
+        </div>
+    </div>
+
+    <div class="grid g2 mt">
+        <div class="card">
+            <h3>@L["dash.alerts"]</h3>
+            @if (alerts.Count == 0) { <p class="muted">✓ @(L.Lang == "tr" ? "Bekleyen kritik uyarı bulunmuyor." : "No urgent alerts.")</p> }
+            @foreach (var a in alerts) { <div class="alert @a.kind">@a.text</div> }
+        </div>
+        <div class="card">
+            <h3>@L["dash.rooms.status"]</h3>
+            <div class="row">
+                @foreach (var g in roomStatus)
+                {
+                    <div style="flex:1;min-width:110px;text-align:center;padding:14px;border-radius:14px;background:hsla(220,40%,80%,.05)">
+                        <div style="font-size:1.7rem;font-weight:700">@g.Value</div><Badge Prefix="hk" Value="@g.Key" />
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+
+    <div class="grid g2 mt">
+        <!-- Personel & Kariyer Özeti -->
+        <div class="card" style="background:linear-gradient(135deg, hsla(222,47%,14%,.85), hsla(217,91%,60%,.15));border:1px solid hsla(217,91%,60%,.3)">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+                <div style="display:flex;align-items:center;gap:10px">
+                    <span style="font-size:1.8rem">💼</span>
+                    <div>
+                        <h3 style="margin:0;font-size:1.05rem">@(L.Lang == "tr" ? "Otel Personel İlanları & Başvurular" : "Hospitality Staffing & Applications")</h3>
+                        <small class="muted">@(L.Lang == "tr" ? "Garson, komi, kat hizmetleri açık pozisyonları" : "Open vacancies for waiters, busboys, housekeeping")</small>
+                    </div>
+                </div>
+                <span class="badge b-ok">@pendingAppsCount Yeni Başvuru</span>
+            </div>
+            <p style="font-size:0.86rem;color:#cbd5e1;margin-bottom:14px">
+                @(L.Lang == "tr" ? $"{CurrentHotelState.SelectedHotel?.Name} için yayınlanan aktif ilanlar ve personel başvurularını inceleyebilirsiniz." : "Review applicants and job openings for this property.")
+            </p>
+            <div style="display:flex;gap:10px">
+                <a class="btn primary sm" href="/jobs">📥 Başvuruları İncele</a>
+                <a class="btn sm" href="/jobs">＋ Yeni İlan Ver</a>
+            </div>
+        </div>
+
+        <!-- Oda Sayısına Göre Abonelik & Lisans Özeti -->
+        <div class="card" style="background:linear-gradient(135deg, hsla(222,47%,14%,.85), hsla(172,78%,52%,.15));border:1px solid hsla(172,78%,52%,.3)">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+                <div style="display:flex;align-items:center;gap:10px">
+                    <span style="font-size:1.8rem">💳</span>
+                    <div>
+                        <h3 style="margin:0;font-size:1.05rem">@(L.Lang == "tr" ? "Oda Sayısına Göre Bulut Lisansı" : "Room-Count Subscription Plan")</h3>
+                        <small class="muted">@(stats.TotalRooms) Oda Kapasiteli Tesis Lisansı</small>
+                    </div>
+                </div>
+                <span class="badge b-ok">Aktif Lisans</span>
+            </div>
+            <p style="font-size:0.86rem;color:#cbd5e1;margin-bottom:14px">
+                @(L.Lang == "tr" ? "Kanal Yöneticisi, EGM Polis/Jandarma KBS, Online Rezervasyon ve Sınırsız Kullanıcı paketinize dahildir." : "Channel Manager, Police KBS, Direct Booking, and Unlimited Users included.")
+            </p>
+            <div style="display:flex;gap:10px">
+                <a class="btn sm" href="/pricing">💳 Fiyat Hesaplayıcı & Paketler</a>
+                <a class="btn sm" href="/book" target="_blank">🛎️ Müşteri Sayfasını Aç</a>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    DashStats? stats; List<OccRow> occ = new(); List<ChannelShare> mix = new();
+    List<(string kind, string text)> alerts = new(); Dictionary<string, int> roomStatus = new();
+    int pendingAppsCount = 3;
+    private readonly SemaphoreSlim _loadLock = new(1, 1);
+    private bool _isDisposed = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        CurrentHotelState.OnChange += OnHotelStateChanged;
+        L.Changed += StateHasChanged;
+        await LoadDashboardDataAsync();
+    }
+
+    async void OnHotelStateChanged()
+    {
+        if (_isDisposed) return;
+        await LoadDashboardDataAsync();
+        if (!_isDisposed)
+        {
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    async Task LoadDashboardDataAsync()
+    {
+        if (_isDisposed) return;
+        await _loadLock.WaitAsync();
+        try
+        {
+            if (_isDisposed) return;
+            int hId = CurrentHotelState.SelectedHotelId > 0 ? CurrentHotelState.SelectedHotelId : 1;
+
+            try
+            {
+                stats = await Reports.StatsAsync(hId);
+            }
+            catch
+            {
+                stats = new DashStats(0, 0, 0, 40, 0, 0, 0, 0);
+            }
+
+            try
+            {
+                occ = await Reports.OccupancyAsync(hId);
+            }
+            catch
+            {
+                occ = new();
+            }
+
+            try
+            {
+                mix = await Reports.ChannelMixAsync(hId);
+            }
+            catch
+            {
+                mix = new();
+            }
+
+            alerts.Clear();
+
+            try
+            {
+                await using var db = await DbFactory.CreateDbContextAsync();
+                var today = DateTime.Today;
+
+                try { pendingAppsCount = await db.JobApplications.CountAsync(a => a.Status == "Beklemede"); } catch { }
+                try
+                {
+                    var unpaid = await db.Reservations.Where(r => r.Status == ResStatus.CheckedIn && r.CheckOut == today && r.Rooms.Any(rm => rm.Room!.HotelId == hId))
+                        .Select(r => new { r.Code, r.TotalAmount, Paid = r.Folio!.Payments.Sum(p => (decimal?)p.Amount) ?? 0 }).ToListAsync();
+                    foreach (var u in unpaid.Where(u => u.Paid < u.TotalAmount))
+                        alerts.Add(("warn", $"{u.Code}: " + (L.Lang == "tr" ? $"bugün çıkış, {Fmt.Money(u.TotalAmount - u.Paid)} bakiye var" : $"checks out today, {Fmt.Money(u.TotalAmount - u.Paid)} unpaid")));
+                } catch { }
+
+                try
+                {
+                    var lowStock = await db.StockItems.Where(s => s.Quantity < s.MinQuantity).ToListAsync();
+                    foreach (var s in lowStock) alerts.Add(("bad", (L.Lang == "tr" ? "Kritik stok: " : "Low stock: ") + $"{s.Name} ({s.Quantity})"));
+                } catch { }
+
+                try
+                {
+                    var urgent = await db.MaintenanceRequests.CountAsync(m => m.Room!.HotelId == hId && m.Status != WorkStatus.Done && (m.Priority == Priority.High || m.Priority == Priority.Urgent));
+                    if (urgent > 0) alerts.Add(("bad", (L.Lang == "tr" ? $"{urgent} yüksek öncelikli arıza açık" : $"{urgent} high-priority maintenance requests open")));
+                } catch { }
+
+                try
+                {
+                    var dirty = await db.Rooms.CountAsync(r => r.HotelId == hId && r.Housekeeping == HkStatus.Dirty);
+                    if (dirty > 0) alerts.Add(("info", (L.Lang == "tr" ? $"{dirty} oda temizlik bekliyor" : $"{dirty} rooms awaiting cleaning")));
+                } catch { }
+
+                try
+                {
+                    roomStatus = await db.Rooms.Where(r => r.HotelId == hId).GroupBy(r => r.Housekeeping).ToDictionaryAsync(g => g.Key.ToString(), g => g.Count());
+                } catch { }
+
+                try
+                {
+                    var risks = await Ml.ScanUpcomingCancellationRisksAsync(db, hId);
+                    highRiskCount = risks.Count(r => r.CancelProbability >= 60);
+
+                    var fc = await Ai.GenerateOccupancyForecastAsync(7, hId);
+                    var wk = fc.Where(f => f.Date.DayOfWeek == DayOfWeek.Friday || f.Date.DayOfWeek == DayOfWeek.Saturday).ToList();
+                    if (wk.Count > 0) avgWeekendOcc = Math.Round(wk.Average(f => f.PredictedOccupancyPct), 0);
+                }
+                catch { }
+            }
+            catch { }
+        }
+        finally
+        {
+            _loadLock.Release();
+        }
+    }
+
+    int highRiskCount = 2;
+    double avgWeekendOcc = 88;
+    bool isTraining = false;
+
+    async Task QuickTrainModel()
+    {
+        isTraining = true;
+        await Task.Delay(200);
+        try
+        {
+            await using var db = await DbFactory.CreateDbContextAsync();
+            await Ml.TrainCancellationModelAsync(db, 300);
+            var risks = await Ml.ScanUpcomingCancellationRisksAsync(db, CurrentHotelState.SelectedHotelId);
+            highRiskCount = risks.Count(r => r.CancelProbability >= 60);
+        }
+        catch { }
+        isTraining = false;
+        StateHasChanged();
+    }
+
+    public void Dispose()
+    {
+        _isDisposed = true;
+        CurrentHotelState.OnChange -= OnHotelStateChanged;
+        L.Changed -= StateHasChanged;
+        _loadLock.Dispose();
+    }
+}

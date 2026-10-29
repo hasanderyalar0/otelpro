@@ -1,0 +1,56 @@
+@page "/reports"
+@inject ReportService ReportSvc
+
+<div class="page-head">
+    <div>
+        <h1>@L["nav.reports"]</h1>
+        <p>@(L.Lang == "tr" ? "Yönetim Raporları: Günlük Doluluk Oranı, Ortalama Günlük Fiyat (ADR) ve RevPAR Göstergeleri" : "Management Reports: Daily Occupancy, ADR and RevPAR analysis")</p>
+    </div>
+</div>
+
+<div class="card mb">
+    <h3>T-SQL Görünümü Üzerinden Canlı RevPAR ve Doluluk Tablosu (vw_RevPAR)</h3>
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th>Tarih</th>
+                    <th class="num">Toplam Oda</th>
+                    <th class="num">Dolu Oda</th>
+                    <th class="num">Doluluk %</th>
+                    <th class="num">Oda Geliri</th>
+                    <th class="num">ADR (Ort. Oda Fiyatı)</th>
+                    <th class="num">RevPAR</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var row in rows)
+                {
+                    var isToday = row.Date.Date == DateTime.Today;
+                    <tr style="@(isToday ? "background:hsla(172,78%,52%,0.1);font-weight:600" : "")">
+                        <td>@Fmt.D(row.Date) @(isToday ? "(Bugün)" : "")</td>
+                        <td class="num">@row.TotalRooms</td>
+                        <td class="num">@row.OccupiedRooms</td>
+                        <td class="num">
+                            <span class="badge @((row.OccupancyPct ?? 0) >= 70 ? "b-Clean" : ((row.OccupancyPct ?? 0) >= 40 ? "b-warn" : "b-bad"))">
+                                %@((row.OccupancyPct ?? 0).ToString("N1"))
+                            </span>
+                        </td>
+                        <td class="num">@Fmt.Money(row.RoomRevenue)</td>
+                        <td class="num">@Fmt.Money(row.ADR ?? 0)</td>
+                        <td class="num" style="color:var(--accent)">@Fmt.Money(row.RevPAR ?? 0)</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>
+
+@code {
+    List<OccRow> rows = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        rows = await ReportSvc.OccupancyAsync();
+    }
+}

@@ -1,0 +1,162 @@
+@page "/channels"
+@inject AppDb Db
+
+<div class="page-head">
+    <div>
+        <div style="display:flex;align-items:center;gap:10px">
+            <h1>@L["nav.channels"]</h1>
+            <span class="badge b-ok" style="font-size:0.85rem">🏢 @(CurrentHotelState.SelectedHotel?.Name ?? "Tesis")</span>
+        </div>
+        <p>@(L.Lang == "tr" ? $"{CurrentHotelState.SelectedHotel?.Name} OTA Entegrasyonları (Booking.com, Airbnb, Expedia) ve Havuz Müsaitlik Senkronizasyonu" : "OTA integrations and 2-way pooled inventory sync")</p>
+    </div>
+    <div class="row">
+        <button class="btn primary sm" @onclick="SyncAllChannels" disabled="@isSyncing">
+            🔄 @(isSyncing ? "Senkronize Ediliyor..." : (L.Lang == "tr" ? "Tüm Kanalları Eşitle" : "Sync All Channels"))
+        </button>
+    </div>
+</div>
+
+<div class="grid g4 mb">
+    @foreach (var ch in channels)
+    {
+        <div class="card" style="display:flex;flex-direction:column;justify-content:space-between">
+            <div>
+                <div class="row" style="justify-content:space-between;margin-bottom:8px">
+                    <b>@ch.Name</b>
+                    <span class="badge @(ch.IsConnected ? "b-Clean" : "b-muted")">
+                        @(ch.IsConnected ? "Bağlı" : "Pasif")
+                    </span>
+                </div>
+                <div class="muted" style="font-size:0.8rem">Komisyon: %@ch.CommissionRate</div>
+                <div class="muted" style="font-size:0.75rem;margin-top:4px">
+                    Son Eşitleme: @(ch.LastSync?.ToString("HH:mm:ss") ?? "Hiç yapılmadı")
+                </div>
+            </div>
+            <div class="row mt" style="justify-content:space-between">
+                <button class="btn sm" @onclick="() => ToggleChannel(ch)">
+                    @(ch.IsConnected ? "Bağlantıyı Kes" : "Bağlan")
+                </button>
+                <button class="btn sm primary" @onclick="() => SyncChannel(ch)" disabled="@(!ch.IsConnected || isSyncing)">
+                    Eşitle
+                </button>
+            </div>
+        </div>
+    }
+</div>
+
+<div class="card">
+    <div class="row" style="justify-content:space-between;margin-bottom:14px">
+        <h3>@(L.Lang == "tr" ? "Kanal Dağıtım Tablosu (Havuz Envanter & Fiyat)" : "Channel Inventory & Allotment")</h3>
+        <select @bind="selectedChannelId" @bind:after="LoadInventory" style="width:200px">
+            @foreach (var ch in channels.Where(c => c.IsConnected))
+            {
+                <option value="@ch.Id">@ch.Name</option>
+            }
+        </select>
+    </div>
+
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th>Tarih</th>
+                    <th>Oda Tipi</th>
+                    <th class="num">Kontenjan (Allotment)</th>
+                    <th class="num">Kanal Satış Fiyatı</th>
+                    <th>Min. Konaklama</th>
+                    <th>Satış Durumu</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var inv in inventories)
+                {
+                    <tr>
+                        <td>@Fmt.D(inv.Date)</td>
+                        <td><b>@inv.RoomType?.Name</b></td>
+                        <td class="num">
+                            <input type="number" style="width:70px;padding:4px" @bind="inv.Allotment" @bind:after="() => SaveInv(inv)" />
+                        </td>
+                        <td class="num">
+                            <input type="number" style="width:90px;padding:4px" @bind="inv.Price" @bind:after="() => SaveInv(inv)" /> ₺
+                        </td>
+                        <td>
+                            <input type="number" style="width:60px;padding:4px" @bind="inv.MinStay" @bind:after="() => SaveInv(inv)" /> Gece
+                        </td>
+                        <td>
+                            <button class="btn sm @(inv.StopSell ? "danger" : "ok")" @onclick="() => ToggleStopSell(inv)">
+                                @(inv.StopSell ? "Satışa Kapalı (Stop-Sell)" : "Açık")
+                            </button>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>
+
+@code {
+    List<Channel> channels = new();
+    List<ChannelInventory> inventories = new();
+    int selectedChannelId;
+    bool isSyncing;
+
+    protected override async Task OnInitializedAsync()
+    {
+        channels = await Db.Channels.OrderBy(c => c.Name).ToListAsync();
+        var firstConn = channels.FirstOrDefault(c => c.IsConnected);
+        if (firstConn != null) selectedChannelId = firstConn.Id;
+        await LoadInventory();
+    }
+
+    async Task LoadInventory()
+    {
+        if (selectedChannelId <= 0) return;
+        int hId = CurrentHotelState.SelectedHotelId;
+        var today = DateTime.Today;
+        inventories = await Db.ChannelInventory
+            .Include(i => i.RoomType)
+            .Where(i => i.ChannelId == selectedChannelId && i.Date >= today && i.RoomType!.HotelId == hId)
+            .OrderBy(i => i.Date).ThenBy(i => i.RoomTypeId)
+            .Take(30)
+            .ToListAsync();
+    }
+
+    async Task ToggleChannel(Channel ch)
+    {
+        ch.IsConnected = !ch.IsConnected;
+        if (ch.IsConnected) ch.LastSync = DateTime.Now;
+        await Db.SaveChangesAsync();
+    }
+
+    async Task SyncChannel(Channel ch)
+    {
+        isSyncing = true;
+        await Task.Delay(400); // Gerçekçi ağ simülasyonu
+        ch.LastSync = DateTime.Now;
+        await Db.SaveChangesAsync();
+        isSyncing = false;
+    }
+
+    async Task SyncAllChannels()
+    {
+        isSyncing = true;
+        await Task.Delay(800);
+        foreach (var ch in channels.Where(c => c.IsConnected))
+        {
+            ch.LastSync = DateTime.Now;
+        }
+        await Db.SaveChangesAsync();
+        isSyncing = false;
+    }
+
+    async Task SaveInv(ChannelInventory inv)
+    {
+        await Db.SaveChangesAsync();
+    }
+
+    async Task ToggleStopSell(ChannelInventory inv)
+    {
+        inv.StopSell = !inv.StopSell;
+        await Db.SaveChangesAsync();
+    }
+}

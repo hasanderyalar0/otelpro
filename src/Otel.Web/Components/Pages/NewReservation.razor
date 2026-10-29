@@ -1,0 +1,264 @@
+@page "/reservations/new"
+@inject AppDb Db
+@inject BookingService Booking
+@inject NavigationManager Nav
+@inject AuthService Auth
+
+<div class="page-head">
+    <div>
+        <h1>@L["nav.newres"]</h1>
+        <p>@(L.Lang == "tr" ? "Yeni rezervasyon oluşturun veya oda blokajı yapın" : "Create a new reservation or block a room")</p>
+    </div>
+    <a class="btn" href="/reservations">← @L["nav.reservations"]</a>
+</div>
+
+<div class="grid g-main">
+    <div class="card">
+        <h3>@(L.Lang == "tr" ? "Rezervasyon Bilgileri" : "Reservation Details")</h3>
+        
+        @if (!string.IsNullOrEmpty(error))
+        {
+            <div class="alert bad">@error</div>
+        }
+
+        <div class="form-grid">
+            <div>
+                <label class="f">@L["c.guest"] (*)</label>
+                <div class="row">
+                    <select @bind="model.GuestId" @bind:after="OnGuestChanged">
+                        <option value="0">-- @(L.Lang == "tr" ? "Misafir Seçin" : "Select Guest") --</option>
+                        @foreach (var g in guests)
+                        {
+                            <option value="@g.Id">@g.FullName (@g.Nationality - @(g.Phone ?? g.Email ?? "İletişim yok"))</option>
+                        }
+                    </select>
+                </div>
+            </div>
+
+            <div>
+                <label class="f">@L["c.roomtype"] (*)</label>
+                <select @bind="model.RoomTypeId" @bind:after="UpdateQuoteAndRooms">
+                    @foreach (var rt in roomTypes)
+                    {
+                        <option value="@rt.Id">@rt.Name (Kapasite: @rt.BaseCapacity-@rt.MaxCapacity) - @Fmt.Money(rt.BasePrice)/gece</option>
+                    }
+                </select>
+            </div>
+
+            <div>
+                <label class="f">@L["c.checkin"]</label>
+                <input type="date" @bind="model.CheckIn" @bind:after="UpdateQuoteAndRooms" />
+            </div>
+
+            <div>
+                <label class="f">@L["c.checkout"]</label>
+                <input type="date" @bind="model.CheckOut" @bind:after="UpdateQuoteAndRooms" />
+            </div>
+
+            <div>
+                <label class="f">@L["c.adults"]</label>
+                <input type="number" min="1" max="10" @bind="model.Adults" @bind:after="UpdateQuoteAndRooms" />
+            </div>
+
+            <div>
+                <label class="f">@L["c.children"]</label>
+                <input type="number" min="0" max="6" @bind="model.Children" @bind:after="UpdateQuoteAndRooms" />
+            </div>
+
+            <div>
+                <label class="f">@L["c.board"]</label>
+                <select @bind="model.BoardTypeId" @bind:after="UpdateQuoteAndRooms">
+                    @foreach (var bt in boardTypes)
+                    {
+                        <option value="@bt.Id">@bt.Name (+@Fmt.Money(bt.PerPersonPerNight)/kişi)</option>
+                    }
+                </select>
+            </div>
+
+            <div>
+                <label class="f">@L["c.channel"]</label>
+                <select @bind="model.ChannelId">
+                    <option value="">Direkt (Otel İçi)</option>
+                    @foreach (var ch in channels)
+                    {
+                        <option value="@ch.Id">@ch.Name (%@ch.CommissionRate Komisyon)</option>
+                    }
+                </select>
+            </div>
+
+            <div>
+                <label class="f">@(L.Lang == "tr" ? "Oda Seçimi (İsteğe Bağlı)" : "Room Assignment (Optional)")</label>
+                <select @bind="model.RoomId">
+                    <option value="">-- @(L.Lang == "tr" ? "Otomatik Ata (Boş Odaya)" : "Auto Assign") --</option>
+                    @foreach (var r in availableRooms)
+                    {
+                        <option value="@r.Id">Oda @r.Number (@r.Floor?.Name)</option>
+                    }
+                </select>
+            </div>
+
+            <div>
+                <label class="f">@L["c.status"]</label>
+                <select @bind="model.Status">
+                    <option value="@ResStatus.Confirmed">@L["st.Confirmed"]</option>
+                    <option value="@ResStatus.Tentative">@L["st.Tentative"]</option>
+                </select>
+            </div>
+
+            <div style="grid-column: 1 / -1;">
+                <label class="f">@(L.Lang == "tr" ? "Promosyon / İndirim Kodu" : "Promo Code")</label>
+                <div class="row">
+                    <input style="max-width:240px" @bind="model.PromoCode" placeholder="örn: ERKEN15" />
+                    <button type="button" class="btn sm" @onclick="UpdateQuoteAndRooms">@(L.Lang == "tr" ? "Uygula" : "Apply")</button>
+                    @if (quote?.PromoMessage != null)
+                    {
+                        <span class="muted" style="font-size:0.85rem">@quote.PromoMessage</span>
+                    }
+                </div>
+            </div>
+
+            <div style="grid-column: 1 / -1;">
+                <label class="f">@L["c.notes"]</label>
+                <textarea rows="2" @bind="model.Notes" placeholder="@(L.Lang == "tr" ? "Özel istekler, misafir notları..." : "Special requests...")"></textarea>
+            </div>
+        </div>
+
+        <div class="row mt" style="justify-content:flex-end">
+            <button class="btn primary" @onclick="SaveReservation" disabled="@busy">
+                💾 @(L.Lang == "tr" ? "Rezervasyonu Kaydet" : "Confirm Reservation")
+            </button>
+        </div>
+    </div>
+
+    <div>
+        <div class="card mb">
+            <h3>@(L.Lang == "tr" ? "Fiyat Özeti" : "Price Summary")</h3>
+            @if (quote != null)
+            {
+                <div class="sum-line">
+                    <span>@L["c.room"] (@quote.Nights @L["c.nights"])</span>
+                    <span>@Fmt.Money(quote.RoomTotal)</span>
+                </div>
+                <div class="sum-line">
+                    <span>@L["c.board"]</span>
+                    <span>@Fmt.Money(quote.BoardTotal)</span>
+                </div>
+                @if (quote.Discount > 0)
+                {
+                    <div class="sum-line" style="color:var(--ok)">
+                        <span>@(L.Lang == "tr" ? "İndirim" : "Discount")</span>
+                        <span>-@Fmt.Money(quote.Discount)</span>
+                    </div>
+                }
+                <div class="sum-line big mt">
+                    <span>@L["c.total"]</span>
+                    <span>@Fmt.Money(quote.Total)</span>
+                </div>
+            }
+            else
+            {
+                <p class="muted">Hesaplanıyor...</p>
+            }
+        </div>
+
+        <div class="card">
+            <h3>@(L.Lang == "tr" ? "Müsait Odalar" : "Available Rooms")</h3>
+            <p class="muted" style="font-size:0.85rem;margin-bottom:12px">
+                @(availableRooms.Count) @(L.Lang == "tr" ? "oda müsait görünüyor" : "rooms available")
+            </p>
+            <div style="display:flex;flex-wrap:wrap;gap:6px">
+                @foreach (var r in availableRooms)
+                {
+                    <span class="badge b-Clean" style="cursor:pointer" @onclick="() => model.RoomId = r.Id">
+                        Kapı @r.Number
+                    </span>
+                }
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    BookingRequest model = new();
+    List<Guest> guests = new();
+    List<RoomType> roomTypes = new();
+    List<BoardType> boardTypes = new();
+    List<Channel> channels = new();
+    List<Room> availableRooms = new();
+    PriceQuote? quote;
+    string? error;
+    bool busy;
+
+    protected override async Task OnInitializedAsync()
+    {
+        guests = await Db.Guests.AsNoTracking().OrderBy(g => g.FirstName).Take(200).ToListAsync();
+        roomTypes = await Db.RoomTypes.AsNoTracking().ToListAsync();
+        boardTypes = await Db.BoardTypes.AsNoTracking().ToListAsync();
+        channels = await Db.Channels.AsNoTracking().Where(c => c.IsActive).ToListAsync();
+
+        if (roomTypes.Count > 0) model.RoomTypeId = roomTypes[0].Id;
+        if (boardTypes.Count > 0) model.BoardTypeId = boardTypes[0].Id;
+
+        await UpdateQuoteAndRooms();
+    }
+
+    async Task UpdateQuoteAndRooms()
+    {
+        error = null;
+        if (model.CheckOut <= model.CheckIn)
+        {
+            model.CheckOut = model.CheckIn.AddDays(1);
+        }
+
+        try
+        {
+            quote = await Booking.QuoteAsync(model.RoomTypeId, model.CheckIn, model.CheckOut, model.Adults, model.Children, model.BoardTypeId, model.PromoCode);
+            availableRooms = await Booking.FreeRoomsAsync(model.CheckIn, model.CheckOut, model.RoomTypeId);
+            if (model.RoomId != null && !availableRooms.Any(r => r.Id == model.RoomId))
+            {
+                model.RoomId = null;
+            }
+        }
+        catch (Exception ex)
+        {
+            error = ex.Message;
+        }
+    }
+
+    async Task OnGuestChanged()
+    {
+        if (model.GuestId > 0 && await Booking.IsBlacklistedAsync(model.GuestId))
+        {
+            error = L.Lang == "tr" ? "DİKKAT: Seçilen misafir kara listededir!" : "WARNING: Guest is blacklisted!";
+        }
+        else
+        {
+            error = null;
+        }
+    }
+
+    async Task SaveReservation()
+    {
+        if (model.GuestId <= 0)
+        {
+            error = L.Lang == "tr" ? "Lütfen bir misafir seçin." : "Please select a guest.";
+            return;
+        }
+
+        busy = true;
+        error = null;
+        try
+        {
+            var res = await Booking.CreateAsync(model);
+            Nav.NavigateTo("/reservations");
+        }
+        catch (Exception ex)
+        {
+            error = ex.InnerException?.Message ?? ex.Message;
+        }
+        finally
+        {
+            busy = false;
+        }
+    }
+}

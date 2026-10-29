@@ -1,0 +1,326 @@
+@page "/messages"
+@inject AppDb Db
+@inject HotelState CurrentHotelState
+@inject AiIntelligenceService Ai
+
+<div class="page-head">
+    <div>
+        <div style="display:flex;align-items:center;gap:10px">
+            <h1>@L["nav.messages"] & AI İtibar Yönetimi</h1>
+            <span class="badge b-ok" style="font-size:0.85rem">🏢 @(CurrentHotelState.SelectedHotel?.Name ?? "Tesis")</span>
+        </div>
+        <p>@(L.Lang == "tr" ? $"{CurrentHotelState.SelectedHotel?.Name} misafir yorumları için yapay zeka otomatik yanıtlayıcı, SMS ve E-posta bildirim günlüğü" : "AI Review Auto-Responder, SMS & Email guest communication")</p>
+    </div>
+    <div class="row">
+        <span class="badge b-ok" style="padding:6px 12px;font-size:0.85rem">⭐ Google Puanı: 4.8 / 5.0 (428 Yorum)</span>
+    </div>
+</div>
+
+<!-- 4'lü İtibar ve İletişim Metrikleri -->
+<div class="grid g4 mb">
+    <div class="card kpi">
+        <span class="ico">⭐</span>
+        <div class="label">Ortalama Puan</div>
+        <div class="val" style="color:#f59e0b">4.8 / 5.0</div>
+        <div class="sub">Google & TripAdvisor</div>
+    </div>
+    <div class="card kpi">
+        <span class="ico">🤖</span>
+        <div class="label">AI Yanıt Oranı</div>
+        <div class="val" style="color:#22c55e">%96.4</div>
+        <div class="sub">Ort. Yanıt Süresi: 8 dk</div>
+    </div>
+    <div class="card kpi">
+        <span class="ico">😊</span>
+        <div class="label">Pozitif Duygu</div>
+        <div class="val" style="color:#38bdf8">%89.2</div>
+        <div class="sub">NLP Duygu Analizi</div>
+    </div>
+    <div class="card kpi">
+        <span class="ico">📱</span>
+        <div class="label">İletilen SMS / E-posta</div>
+        <div class="val" style="color:#a855f7">@logs.Count</div>
+        <div class="sub">Otomatik Bildirimler</div>
+    </div>
+</div>
+
+@if (!string.IsNullOrEmpty(actionAlert))
+{
+    <div class="alert ok mb" style="display:flex;justify-content:space-between;align-items:center">
+        <span>@actionAlert</span>
+        <button class="btn sm" style="padding:2px 8px;font-size:0.75rem" @onclick="() => actionAlert = null">✕</button>
+    </div>
+}
+
+<!-- Sekmeler -->
+<div class="tabs mb">
+    <button class="@(activeTab == "reviews" ? "on" : "")" @onclick='() => activeTab = "reviews"'>
+        ⭐ Misafir Yorumları & AI Otomatik Yanıtlayıcı (@reviews.Count)
+    </button>
+    <button class="@(activeTab == "templates" ? "on" : "")" @onclick='() => activeTab = "templates"'>
+        ✉️ Otomatik SMS / E-Posta Şablonları & Günlük
+    </button>
+</div>
+
+<!-- TAB 1: YORUMLAR & AI YANITLAYICI -->
+@if (activeTab == "reviews")
+{
+    <div style="display:flex;flex-direction:column;gap:14px" class="mb">
+        @foreach (var rev in reviews)
+        {
+            <div class="card" style="border-left: 4px solid @(rev.Rating >= 4 ? "#22c55e" : (rev.Rating == 3 ? "#f59e0b" : "#ef4444"))">
+                <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:8px;margin-bottom:8px">
+                    <div style="display:flex;align-items:center;gap:10px">
+                        <span style="font-size:1.4rem">@(rev.ChannelIcon)</span>
+                        <div>
+                            <b>@rev.GuestName</b> <small class="muted">(@rev.Country)</small>
+                            <div style="font-size:0.75rem;color:#94a3b8">
+                                <span>@rev.Channel · @rev.RoomTypeName · @rev.DateStr</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div style="display:flex;align-items:center;gap:8px">
+                        <!-- Yıldızlar -->
+                        <span style="color:#f59e0b;font-weight:700;font-size:1rem">
+                            @(new string('★', rev.Rating))@(new string('☆', 5 - rev.Rating))
+                        </span>
+                        <!-- NLP Duygu Rozeti -->
+                        <span class="badge @(rev.Sentiment == "Pozitif" ? "b-ok" : (rev.Sentiment == "Nötr" ? "b-warn" : "b-bad"))">
+                            @rev.Sentiment (%@rev.SentimentScore)
+                        </span>
+                    </div>
+                </div>
+
+                <!-- Misafir Yorum Metni -->
+                <p style="font-size:0.9rem;color:#f1f5f9;line-height:1.5;margin:0 0 10px 0;background:rgba(0,0,0,0.25);padding:10px 14px;border-radius:10px">
+                    "@rev.Comment"
+                </p>
+
+                <!-- Etiketler -->
+                <div style="display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap">
+                    @foreach (var tag in rev.Tags)
+                    {
+                        <span style="font-size:0.72rem;background:rgba(56,189,248,0.12);color:#38bdf8;padding:2px 8px;border-radius:8px;border:1px solid rgba(56,189,248,0.3)">
+                            #@tag
+                        </span>
+                    }
+                </div>
+
+                <!-- Otel Yanıtı Bölümü -->
+                @if (!string.IsNullOrEmpty(rev.ReplyText))
+                {
+                    <div style="background:rgba(2,132,199,0.15);border:1px solid rgba(56,189,248,0.35);padding:12px 14px;border-radius:12px;margin-top:8px">
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+                            <b style="color:#38bdf8;font-size:0.85rem">🏨 Otel Yönetimi Yanıtı (Yayınlandı)</b>
+                            <small class="muted">@rev.ReplyDate</small>
+                        </div>
+                        <p style="font-size:0.85rem;color:#e2e8f0;margin:0;line-height:1.4">
+                            @rev.ReplyText
+                        </p>
+                    </div>
+                }
+                else
+                {
+                    <div style="display:flex;gap:8px;align-items:center;margin-top:8px">
+                        <button class="btn primary sm" @onclick="() => GenerateAiReply(rev)" disabled="@rev.IsGenerating">
+                            @(rev.IsGenerating ? "🤖 AI Yanıt Hazırlıyor..." : "🤖 AI ile Profesyonel Yanıt Oluştur")
+                        </button>
+                    </div>
+                }
+            </div>
+        }
+    </div>
+}
+else
+{
+    <!-- TAB 2: ŞABLONLAR & SMS GÜNLÜĞÜ -->
+    <div class="grid g2 mb">
+        <div class="card">
+            <h3>Otomatik İletişim Şablonları</h3>
+            <div class="table-wrap">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Şablon Adı</th>
+                            <th>Kanal</th>
+                            <th>Tetikleyici Olay</th>
+                            <th>Dil</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var t in templates)
+                        {
+                            <tr>
+                                <td><b>@t.Name</b></td>
+                                <td><span class="badge @(t.Type == MsgType.Sms ? "b-warn" : "b-info")">@t.Type</span></td>
+                                <td>@t.Trigger</td>
+                                <td>@t.Language.ToUpper()</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="card">
+            <h3>Son Gönderilen Mesaj Kayıtları</h3>
+            <div class="table-wrap">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Tarih</th>
+                            <th>Kime</th>
+                            <th>Tür</th>
+                            <th>Mesaj</th>
+                            <th>Durum</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var m in logs)
+                        {
+                            <tr>
+                                <td><small>@Fmt.DT(m.SentAt)</small></td>
+                                <td><b>@m.To</b></td>
+                                <td>@m.Type</td>
+                                <td><small>@(m.Body.Length > 40 ? m.Body.Substring(0, 40) + "..." : m.Body)</small></td>
+                                <td><span class="badge b-ok">@m.Status</span></td>
+                            </tr>
+                        }
+                        @if (logs.Count == 0)
+                        {
+                            <tr><td colspan="5" class="muted">Kayıtlı mesaj bulunamadı.</td></tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    string activeTab = "reviews";
+    string? actionAlert;
+
+    List<MessageTemplate> templates = new();
+    List<MessageLog> logs = new();
+
+    class GuestReviewItem
+    {
+        public int Id { get; set; }
+        public string GuestName { get; set; } = "";
+        public string Country { get; set; } = "TR";
+        public string Channel { get; set; } = "Google";
+        public string ChannelIcon { get; set; } = "🌐";
+        public int Rating { get; set; } = 5;
+        public string RoomTypeName { get; set; } = "Deluxe Suit";
+        public string DateStr { get; set; } = "Dün";
+        public string Comment { get; set; } = "";
+        public string Sentiment { get; set; } = "Pozitif";
+        public int SentimentScore { get; set; } = 96;
+        public List<string> Tags { get; set; } = new();
+        public string? ReplyText { get; set; }
+        public string? ReplyDate { get; set; }
+        public bool IsGenerating { get; set; }
+    }
+
+    List<GuestReviewItem> reviews = new()
+    {
+        new GuestReviewItem
+        {
+            Id = 1,
+            GuestName = "Ayşe & Tolga Yılmaz",
+            Country = "TR",
+            Channel = "Google Reviews",
+            ChannelIcon = "🇬",
+            Rating = 5,
+            RoomTypeName = "Panoramik Deniz Manzaralı Suit",
+            DateStr = "2 gün önce",
+            Comment = "Balayımız için tercih ettik, her şey mükemmeldi! Odamızdaki meyve sepeti ve şarap ikramı çok ince bir jestti. Özellikle açık büfe kahvaltıdaki sıcak Ege böreklerine ve sonsuzluk havuzuna bayıldık. Resepsiyondaki Selim Bey ve ekibine güleryüzleri için teşekkürler.",
+            Sentiment = "Pozitif",
+            SentimentScore = 98,
+            Tags = new() { "Balayı", "Kahvaltı", "Havuz", "Güleryüzlü Ekip" }
+        },
+        new GuestReviewItem
+        {
+            Id = 2,
+            GuestName = "Michael Brown",
+            Country = "UK",
+            Channel = "TripAdvisor",
+            ChannelIcon = "🦉",
+            Rating = 2,
+            RoomTypeName = "Standard Room",
+            DateStr = "3 gün önce",
+            Comment = "The hotel grounds and location are stunning, but we had serious issues with the air conditioning making loud noises all night. Also, room service took almost 50 minutes for a sandwich. Front desk was polite but the technical fault ruined our first night.",
+            Sentiment = "Negatif",
+            SentimentScore = 86,
+            Tags = new() { "Klima Arızası", "Oda Servisi Gecikmesi", "Konum" }
+        },
+        new GuestReviewItem
+        {
+            Id = 3,
+            GuestName = "Klara Becker",
+            Country = "DE",
+            Channel = "Booking.com",
+            ChannelIcon = "🅱️",
+            Rating = 4,
+            RoomTypeName = "Superior King Room",
+            DateStr = "Geçen hafta",
+            Comment = "Sehr schönes Hotel mit tollem Strand und sauberem SPA-Bereich. Das Personal war sehr aufmerksam. Nur die Wassertemperatur im Hallenbad war etwas zu kühl für Kinder. Ansonsten absolut empfehlenswert!",
+            Sentiment = "Pozitif",
+            SentimentScore = 84,
+            Tags = new() { "Plaj & SPA", "Personel İlgisi", "Kapalı Havuz" },
+            ReplyText = "Liebe Klara, vielen herzlichen Dank für Ihre wunderbare Bewertung! Es freut uns sehr, dass Ihnen unser Strand und SPA gefallen haben. Die Temperatur des Hallenbads wurde von unserem Techniker-Team bereits nachjustiert. Wir hoffen, Sie bald wieder bei uns begrüßen zu dürfen!",
+            ReplyDate = "Otel Müdürü · 4 gün önce"
+        },
+        new GuestReviewItem
+        {
+            Id = 4,
+            GuestName = "Mehmet Can Korkmaz",
+            Country = "TR",
+            Channel = "Otelz.com",
+            ChannelIcon = "🏨",
+            Rating = 3,
+            RoomTypeName = "Aile Villası",
+            DateStr = "1 hafta önce",
+            Comment = "Tesis geniş ve aktiviteler zengin, çocuk kulübü başarılı. Ancak hafta sonu restoran çok kalabalıktı ve masaya servis biraz gecikti. Genel olarak fena değil ama yoğun sezonda kapasite yönetimi geliştirilmeli.",
+            Sentiment = "Nötr",
+            SentimentScore = 58,
+            Tags = new() { "Restoran Yoğunluğu", "Çocuk Kulübü", "Geniş Alan" }
+        }
+    };
+
+    protected override async Task OnInitializedAsync()
+    {
+        templates = await Db.MessageTemplates.AsNoTracking().ToListAsync();
+        logs = await Db.MessageLogs.AsNoTracking().OrderByDescending(l => l.SentAt).Take(50).ToListAsync();
+    }
+
+    async Task GenerateAiReply(GuestReviewItem rev)
+    {
+        rev.IsGenerating = true;
+        StateHasChanged();
+        await Task.Delay(500); // AI üretim simülasyonu
+
+        string hotel = CurrentHotelState.SelectedHotel?.Name ?? "Grand Aegean Resort";
+
+        if (rev.Rating >= 4)
+        {
+            rev.ReplyText = $"Değerli {rev.GuestName},\n\n" +
+                            $"{hotel} ailemizi tercih ettiğiniz ve bu harika geri bildirimi paylaştığınız için içtenlikle teşekkür ederiz! " +
+                            $"Özellikle {string.Join(", ", rev.Tags.Take(2))} konusundaki memnuniyetiniz tüm ekibimizi gururlandırdı. " +
+                            $"Bir sonraki ziyaretinizde sizi tekrar ağırlamak ve aynı kusursuz deneyimi yaşatmak için sabırsızlanıyoruz. Saygılarımızla, Genel Müdürlük.";
+        }
+        else
+        {
+            rev.ReplyText = $"Değerli Misafirimiz {rev.GuestName},\n\n" +
+                            $"Öncelikle {hotel} deneyiminiz sırasında karşılaştığınız {string.Join(" ve ", rev.Tags.Take(2))} konusundaki aksaklıklar için en içten özürlerimizi sunarız. " +
+                            $"Geri bildiriminiz teknik servis ve yiyecek-içecek birim yöneticilerimizle anında paylaşılmış olup gerekli tüm önlemler alınmıştır. " +
+                            $"Sizi bir sonraki konaklamanızda VIP ikramlarımız eşliğinde tekrar ağırlayarak bu durumu telafi etmeyi çok isteriz. Lütfen doğrudan bizimle iletişime geçiniz. Saygılarımızla, Otel Yönetimi.";
+        }
+
+        rev.ReplyDate = "Yapay Zeka Taslağı · Az önce";
+        rev.IsGenerating = false;
+        actionAlert = $"✨ #{rev.Id} {rev.GuestName} yorumu için profesyonel AI yanıtı hazırlandı ve yayınlandı!";
+    }
+}

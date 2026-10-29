@@ -1,0 +1,1432 @@
+@page "/nearby"
+@layout Otel.Web.Components.Layout.PublicLayout
+@inject NearbyService NearbySvc
+@inject IDbContextFactory<AppDb> DbFactory
+@inject IJSRuntime JS
+@implements IAsyncDisposable
+
+<div class="nearby-public-container">
+    <div class="nearby-hero">
+        <div class="nearby-hero-info">
+            <div class="hero-tag-chip">🗺️ @(L.Lang == "tr" ? "TÜRKİYE'NİN SEÇKİN DESTİNASYONLARI & AKTİVİTELERİ" : "HANDPICKED LUXURY DESTINATIONS & EXPERIENCES")</div>
+            <h1><span>✨</span> @(L.Lang == "tr" ? "Lüks Otel Koleksiyonumuz & Çevre Rehberi" : "Luxury Hotel Collection & Experiences")</h1>
+            <p>
+                @(selectedHotel != null
+                    ? (L.Lang == "tr"
+                        ? $"{selectedHotel.Name} ({selectedHotel.City}) tesisimize en yakın barlar, seçkin restoranlar ve yapılacak aktiviteler. Mesafeler seçtiğiniz otele göre anlık hesaplanmaktadır."
+                        : $"Showing curated places and activities closest to {selectedHotel.Name} ({selectedHotel.City}). Distances are dynamically calculated from this hotel.")
+                    : (L.Lang == "tr"
+                        ? "Bodrum'un turkuaz koylarından Boğaziçi'ne, Kapadokya vadilerinden Uludağ karlı zirvelerine ve Mardin'in tarihi taş konaklarına kadar 8 seçkin tesisimiz ve çevre aktiviteleri."
+                        : "From the Aegean turquoise coves to Cappadocia valleys, Uludağ ski peaks and Mardin historical stone palaces: explore our 8 signature destinations and activities."))
+            </p>
+        </div>
+        <div class="nearby-hero-actions">
+            <a href="/book@(selectedHotelId.HasValue ? $"?hotelId={selectedHotelId.Value}" : "")" class="btn primary hero-book-btn">
+                🛎️ @(L.Lang == "tr" ? "Hemen Rezervasyon Yap" : "Book Room Now")
+            </a>
+            <a href="/trip-planner@(selectedHotelId.HasValue ? $"?hotelId={selectedHotelId.Value}" : "")" class="btn" style="background:linear-gradient(135deg, #6366f1, #8b5cf6);border:none;color:#fff;font-weight:700">
+                🗺️ @(L.Lang == "tr" ? "AI Kişisel Rota Oluşturucu" : "AI Trip Planner")
+            </a>
+            <button class="btn" @onclick="OpenConciergeModal">💬 @(L.Lang == "tr" ? "AI Concierge Önerisi" : "AI Concierge")</button>
+            <button class="btn ghost-btn" @onclick="OpenAddPlaceModal" title="Yeni Mekan / Aktivite Ekle">＋ @(L.Lang == "tr" ? "Mekan Ekle" : "Add Place")</button>
+        </div>
+    </div>
+
+    <!-- 🌟 Lüks Otel Koleksiyonu Vitrini (8 Otel Görsel Kartları) -->
+    <div class="luxury-showcase-section">
+        <div class="showcase-header">
+            <div>
+                <div class="showcase-kicker">👑 8 SEÇKİN DESTİNASYONDA BENZERSİZ DENEYİMLER</div>
+                <h2 class="showcase-title">@(L.Lang == "tr" ? "Otel Portföyümüzü Keşfedin" : "Explore Our Hotel Portfolio")</h2>
+                <p class="showcase-desc">
+                    @(L.Lang == "tr"
+                        ? "Aşağıdaki tesis kartlarından dilediğinizi seçerek yakın çevresindeki turları, gurme restoranları ve barları inceleyebilir ya da doğrudan komisyonsuz rezervasyon yapabilirsiniz."
+                        : "Select any property below to view nearby activities, fine dining, or book directly.")
+                </p>
+            </div>
+            <div class="showcase-stats-tag">
+                <span>✨ @hotels.Count @(L.Lang == "tr" ? "Özel Destinasyon" : "Properties")</span>
+                <span>⭐ @(L.Lang == "tr" ? "%100 Doğrudan Rezervasyon" : "Direct Booking")</span>
+            </div>
+        </div>
+
+        <div class="hotel-cards-grid">
+            @foreach (var h in hotels)
+            {
+                var isSelected = selectedHotelId == h.Id;
+                var hotelImg = !string.IsNullOrEmpty(h.ImageUrl) ? h.ImageUrl : "/hero.jpg";
+                <div class="luxury-hotel-card @(isSelected ? "selected" : "")">
+                    <div class="hotel-card-media" style="background-image: url('@hotelImg')">
+                        <div class="hotel-media-overlay"></div>
+                        <div class="hotel-city-chip">
+                            @if (h.City.Contains("Bodrum")) { <span>🌊 Bodrum / Muğla</span> }
+                            else if (h.City.Contains("İstanbul")) { <span>🕌 Beşiktaş / İstanbul</span> }
+                            else if (h.City.Contains("Antalya")) { <span>🌴 Lara / Antalya</span> }
+                            else if (h.City.Contains("Kapadokya") || h.City.Contains("Nevşehir")) { <span>🎈 Göreme / Kapadokya</span> }
+                            else if (h.City.Contains("Çeşme") || h.City.Contains("İzmir")) { <span>⛵ Alaçatı / Çeşme</span> }
+                            else if (h.City.Contains("Uludağ") || h.City.Contains("Bursa")) { <span>🎿 Uludağ / Bursa</span> }
+                            else if (h.City.Contains("Fethiye")) { <span>🪂 Ölüdeniz / Fethiye</span> }
+                            else if (h.City.Contains("Mardin")) { <span>🏛️ Artuklu / Mardin</span> }
+                            else { <span>📍 @h.City</span> }
+                        </div>
+                        <div class="hotel-stars-pill">
+                            @string.Concat(Enumerable.Repeat("★", h.Stars)) 5★
+                        </div>
+                    </div>
+
+                    <div class="hotel-card-body">
+                        <h3 class="hotel-title">@h.Name</h3>
+                        <p class="hotel-concept">
+                            @if (h.City.Contains("Uludağ")) { <span>Kış Sporları, Telesiyej Erişimi & Şifalı Termal Spa</span> }
+                            else if (h.City.Contains("Fethiye")) { <span>Ölüdeniz Lagün Manzarası & Müstakil Havuzlu Villalar</span> }
+                            else if (h.City.Contains("Mardin")) { <span>600 Yıllık Tarihi Taş Konak & Sonsuz Mezopotamya Manzarası</span> }
+                            else if (h.City.Contains("İstanbul")) { <span>Tarihi Boğaziçi Yalı Hattı & Saray Panoraması</span> }
+                            else if (h.City.Contains("Kapadokya")) { <span>Doğal Kaya Oyma Cave Süitler & Balon Seyir Terası</span> }
+                            else if (h.City.Contains("Çeşme")) { <span>Tarihi Alaçatı Taş Mimarisi & Marina Yat Limanı</span> }
+                            else if (h.City.Contains("Antalya")) { <span>Ultra Her Şey Dahil Akdeniz Sahili & Özel Plaj</span> }
+                            else { <span>Ege'nin Turkuaz Koyları, Özel Marinalı Lüks Resort</span> }
+                        </p>
+
+                        <div class="hotel-card-actions">
+                            <button class="btn-explore-hotel @(isSelected ? "active" : "")" @onclick="() => SelectHotel(h.Id)">
+                                📍 @(isSelected ? (L.Lang == "tr" ? "Seçili Tesis" : "Selected") : (L.Lang == "tr" ? "Çevreyi Gör" : "Explore Nearby"))
+                            </button>
+                            <a href="/book?hotelId=@h.Id" class="btn-book-hotel">
+                                🛎️ @(L.Lang == "tr" ? "Rezervasyon" : "Book")
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+    </div>
+
+<!-- Çoklu Otel Seçici Çubuğu -->
+<div class="hotel-selector-bar">
+    <button class="hotel-pill-btn @(selectedHotelId == null ? "active" : "")" @onclick="() => SelectHotel(null)">
+        <span>🌐</span>
+        <span>@(L.Lang == "tr" ? "Tüm Oteller" : "All Hotels")</span>
+        <span class="hotel-city-badge">@hotels.Count @(L.Lang == "tr" ? "Tesis" : "Props")</span>
+    </button>
+    @foreach (var h in hotels)
+    {
+        <button class="hotel-pill-btn @(selectedHotelId == h.Id ? "active" : "")" @onclick="() => SelectHotel(h.Id)">
+            <span>🏨</span>
+            <span>@h.Name</span>
+            <span class="hotel-city-badge">@h.City</span>
+        </button>
+    }
+</div>
+
+<!-- Seçili Otel Bilgi & Hızlı Filtre Paneli -->
+@if (selectedHotel != null)
+{
+    <div class="hotel-banner-card">
+        <div style="display:flex;align-items:center;gap:16px">
+            <div style="width:52px;height:52px;border-radius:14px;background:var(--grad);display:grid;place-items:center;font-size:26px;box-shadow:0 6px 20px -4px hsla(172,80%,50%,.6)">🏨</div>
+            <div>
+                <div class="hotel-banner-badge">📍 SEÇİLİ TESİS & YAKIN ÇEVRESİ</div>
+                <div style="display:flex;align-items:center;gap:10px">
+                    <h2 style="margin:0;font-size:1.35rem;font-weight:700">@selectedHotel.Name</h2>
+                    <span style="color:#ffd159;font-size:.9rem">@string.Concat(Enumerable.Repeat("★", selectedHotel.Stars))</span>
+                </div>
+                <div class="muted" style="font-size:.86rem;margin-top:3px">
+                    <span>📍 @selectedHotel.Address, @selectedHotel.City</span>
+                    @if (!string.IsNullOrEmpty(selectedHotel.Phone))
+                    {
+                        <span> • 📞 @selectedHotel.Phone</span>
+                    }
+                </div>
+            </div>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+            <a href="/book?hotelId=@selectedHotel.Id" class="btn sm" style="background:linear-gradient(135deg,#0ea5e9,#38bdf8);border:none;color:#fff;font-weight:700;display:inline-flex;align-items:center;gap:6px">
+                🛎️ @(L.Lang == "tr" ? "Bu Otele Rezervasyon Yap" : "Book This Hotel")
+            </a>
+            <button class="btn sm @(currentCat == "All" ? "primary" : "")" @onclick='() => SetCategory("All")'>
+                ✨ @(L.Lang == "tr" ? "Otele Yakın Tümü" : "All Nearby") (@allNearSelectedCount)
+            </button>
+            <button class="btn sm @(currentCat == "Activity" ? "primary" : "")" @onclick='() => SetCategory("Activity")'>
+                🏄‍♂️ @(L.Lang == "tr" ? "Aktiviteler" : "Activities") (@(stats?.ActivitiesCount ?? 0))
+            </button>
+            <button class="btn sm @(currentCat == "Restaurant" ? "primary" : "")" @onclick='() => SetCategory("Restaurant")'>
+                🍽️ @(L.Lang == "tr" ? "Restoranlar" : "Restaurants") (@(stats?.RestaurantsCount ?? 0))
+            </button>
+            <button class="btn sm @(currentCat == "Bar" ? "primary" : "")" @onclick='() => SetCategory("Bar")'>
+                🍸 @(L.Lang == "tr" ? "Barlar" : "Bars") (@(stats?.BarsCount ?? 0))
+            </button>
+            @if (selectedHotel.Latitude.HasValue && selectedHotel.Longitude.HasValue)
+            {
+                <button class="btn sm" @onclick="() => FocusHotelOnMap(selectedHotel)">
+                    🗺️ @(L.Lang == "tr" ? "Haritada Odaklan" : "Focus Map")
+                </button>
+            }
+        </div>
+    </div>
+}
+
+<!-- İnteraktif Leaflet Haritası -->
+@if (mapViewMode != "only-list")
+{
+    <div class="map-card-wrapper">
+        <div class="map-view-controls">
+            <button class="map-view-btn @(mapViewMode == "split" ? "active" : "")" @onclick='() => SetMapMode("split")'>
+                🗺️ @(L.Lang == "tr" ? "Harita & Liste" : "Map & List")
+            </button>
+            <button class="map-view-btn @(mapViewMode == "large" ? "active" : "")" @onclick='() => SetMapMode("large")'>
+                🔍 @(L.Lang == "tr" ? "Geniş Harita" : "Large Map")
+            </button>
+            <button class="map-view-btn" @onclick='() => SetMapMode("only-list")'>
+                ✕ @(L.Lang == "tr" ? "Haritayı Gizle" : "Hide Map")
+            </button>
+        </div>
+
+        <div id="nearbyMap" style="height:@(mapViewMode == "large" ? "620px" : "430px"); width:100%; transition:height .3s ease;"></div>
+
+        <div class="map-legend-bar">
+            <span class="muted" style="font-weight:600;font-size:.74rem">HARİTA GÖSTERGESİ:</span>
+            <span class="map-legend-item"><span class="map-legend-dot dot-hotel"></span> 🏨 Otel Noktaları (@hotels.Count)</span>
+            <span class="map-legend-item"><span class="map-legend-dot dot-act"></span> 🏄‍♂️ Turlar & Aktiviteler (@(stats?.ActivitiesCount ?? 0))</span>
+            <span class="map-legend-item"><span class="map-legend-dot dot-rest"></span> 🍽️ Restoranlar (@(stats?.RestaurantsCount ?? 0))</span>
+            <span class="map-legend-item"><span class="map-legend-dot dot-bar"></span> 🍸 Barlar & Gece (@(stats?.BarsCount ?? 0))</span>
+            <span class="sp"></span>
+            <span class="muted" style="font-size:.76rem">💡 Haritadaki işaretçilere tıklayarak detay ve yol tarifini inceleyebilirsiniz.</span>
+        </div>
+    </div>
+}
+else
+{
+    <div style="margin-bottom:18px">
+        <button class="btn sm" @onclick='() => SetMapMode("split")'>🗺️ @(L.Lang == "tr" ? "İnteraktif Haritayı Göster" : "Show Interactive Map")</button>
+    </div>
+}
+
+<!-- KPI İstatistik Kartları -->
+@if (stats != null)
+{
+    <div class="grid g4 mb">
+        <div class="card kpi" style="cursor:pointer" @onclick='() => SetCategory("Activity")'>
+            <span class="ico">🏄‍♂️</span>
+            <div class="label">@(L.Lang == "tr" ? "Turlar & Aktiviteler" : "Tours & Activities")</div>
+            <div class="val">@stats.ActivitiesCount</div>
+            <div class="sub">@(selectedHotel != null ? selectedHotel.City : "Tüm Tesisler")</div>
+        </div>
+        <div class="card kpi" style="cursor:pointer" @onclick='() => SetCategory("Restaurant")'>
+            <span class="ico">🍽️</span>
+            <div class="label">@(L.Lang == "tr" ? "Seçkin Restoranlar" : "Fine Restaurants")</div>
+            <div class="val">@stats.RestaurantsCount</div>
+            <div class="sub">@(selectedHotel != null ? selectedHotel.City : "Tüm Tesisler")</div>
+        </div>
+        <div class="card kpi" style="cursor:pointer" @onclick='() => SetCategory("Bar")'>
+            <span class="ico">🍸</span>
+            <div class="label">@(L.Lang == "tr" ? "Barlar & Gece Hayatı" : "Bars & Nightlife")</div>
+            <div class="val">@stats.BarsCount</div>
+            <div class="sub">@(selectedHotel != null ? selectedHotel.City : "Tüm Tesisler")</div>
+        </div>
+        <div class="card kpi" style="cursor:pointer" @onclick="TogglePartners">
+            <span class="ico">🎁</span>
+            <div class="label">@(L.Lang == "tr" ? "Otel İndirimli" : "Partner Discounts")</div>
+            <div class="val">@stats.PartnersCount</div>
+            <div class="sub">@(L.Lang == "tr" ? "Anlaşmalı VIP noktalar" : "Exclusive perks")</div>
+        </div>
+    </div>
+}
+
+<!-- Filtre Paneli -->
+<div class="nearby-filter-panel">
+    <div class="nearby-cat-pills">
+        <button class="nearby-cat-btn @(currentCat == "All" ? "active" : "")" @onclick='() => SetCategory("All")'>
+            <span>✨</span> @(L.Lang == "tr" ? "Tümü" : "All") (@filteredPlaces.Count)
+        </button>
+        <button class="nearby-cat-btn @(currentCat == "Activity" ? "active" : "")" @onclick='() => SetCategory("Activity")'>
+            <span>🏄‍♂️</span> @(L.Lang == "tr" ? "Aktiviteler & Turlar" : "Activities") (@(stats?.ActivitiesCount ?? 0))
+        </button>
+        <button class="nearby-cat-btn @(currentCat == "Restaurant" ? "active" : "")" @onclick='() => SetCategory("Restaurant")'>
+            <span>🍽️</span> @(L.Lang == "tr" ? "Restoranlar" : "Restaurants") (@(stats?.RestaurantsCount ?? 0))
+        </button>
+        <button class="nearby-cat-btn @(currentCat == "Bar" ? "active" : "")" @onclick='() => SetCategory("Bar")'>
+            <span>🍸</span> @(L.Lang == "tr" ? "Barlar" : "Bars") (@(stats?.BarsCount ?? 0))
+        </button>
+    </div>
+
+    <div class="nearby-subfilters">
+        <div class="nearby-toggle-partner @(onlyPartners ? "on" : "")" @onclick="TogglePartners">
+            <span>🎁</span> @(L.Lang == "tr" ? "Sadece Otel İndirimli" : "Discounts Only")
+        </div>
+
+        <select style="width:auto;min-width:140px" @bind="distFilter" @bind:after="ApplyFilters">
+            <option value="0">@(L.Lang == "tr" ? "Tüm Mesafeler" : "All Distances")</option>
+            <option value="1200">🚶 @(L.Lang == "tr" ? "< 1.2 km (Yürüme)" : "< 1.2 km")</option>
+            <option value="5000">🚗 @(L.Lang == "tr" ? "< 5 km (Yakın Araç)" : "< 5 km")</option>
+            <option value="15000">🚘 @(L.Lang == "tr" ? "< 15 km" : "< 15 km")</option>
+            <option value="70000">🗺️ @(L.Lang == "tr" ? "< 70 km (Bölgesel)" : "< 70 km")</option>
+        </select>
+
+        <select style="width:auto;min-width:130px" @bind="priceFilter" @bind:after="ApplyFilters">
+            <option value="0">@(L.Lang == "tr" ? "Tüm Fiyatlar" : "All Prices")</option>
+            <option value="1">₺ (Ekonomik)</option>
+            <option value="2">₺₺ (Orta)</option>
+            <option value="3">₺₺₺ (Seçkin)</option>
+            <option value="4">₺₺₺₺ (Lüks)</option>
+        </select>
+
+        <input type="text" class="search" placeholder="@(L.Lang == "tr" ? "Mekan, aktivite veya tur ara..." : "Search place or tour...")"
+               @bind="searchTerm" @bind:event="oninput" @bind:after="ApplyFilters" />
+    </div>
+</div>
+
+@if (currentCat == "Activity" || currentCat == "All")
+{
+    <!-- Aktiviteler Tür Alt-Filtresi -->
+    <div class="activity-subcat-bar">
+        <span class="activity-subcat-title">🏄‍♂️ @(L.Lang == "tr" ? "Aktivite Türü:" : "Experience Type:")</span>
+        <button class="activity-subcat-btn @(activitySubcat == "All" ? "active" : "")" @onclick='() => SetActivitySubcat("All")'>
+            ✨ @(L.Lang == "tr" ? "Tüm Aktiviteler" : "All Activities")
+        </button>
+        <button class="activity-subcat-btn @(activitySubcat == "Sea" ? "active" : "")" @onclick='() => SetActivitySubcat("Sea")'>
+            ⛵ @(L.Lang == "tr" ? "Su Sporları & Tekne" : "Water Sports & Yacht")
+        </button>
+        <button class="activity-subcat-btn @(activitySubcat == "Nature" ? "active" : "")" @onclick='() => SetActivitySubcat("Nature")'>
+            🌄 @(L.Lang == "tr" ? "Doğa & Macera" : "Nature & Adventure")
+        </button>
+        <button class="activity-subcat-btn @(activitySubcat == "Culture" ? "active" : "")" @onclick='() => SetActivitySubcat("Culture")'>
+            🏛️ @(L.Lang == "tr" ? "Tarih & Kültür" : "History & Culture")
+        </button>
+        <button class="activity-subcat-btn @(activitySubcat == "Spa" ? "active" : "")" @onclick='() => SetActivitySubcat("Spa")'>
+            🧖 @(L.Lang == "tr" ? "Hamam & Spa" : "Hammam & Spa")
+        </button>
+    </div>
+}
+
+<!-- Kartlar Listesi -->
+@if (loading)
+{
+    <div style="text-align:center;padding:40px" class="muted">⏳ @(L.Lang == "tr" ? "Mekanlar ve harita yükleniyor..." : "Loading places...")</div>
+}
+else if (filteredPlaces.Count == 0)
+{
+    <div class="card" style="text-align:center;padding:60px 20px">
+        <div style="font-size:3rem;margin-bottom:12px">🏝️</div>
+        <h3>@(L.Lang == "tr" ? "Seçilen otele yakın kriterlere uygun yer bulunamadı" : "No places found for selected hotel")</h3>
+        <p class="muted" style="margin-top:8px">@(L.Lang == "tr" ? "Filtreleri sıfırlayarak bu otele yakın tüm noktaları görebilirsiniz." : "Reset filters to view all nearby options.")</p>
+        <button class="btn mt" @onclick="ResetFilters">↺ @(L.Lang == "tr" ? "Filtreleri Sıfırla" : "Reset Filters")</button>
+    </div>
+}
+else
+{
+    <div class="nearby-grid">
+        @foreach (var place in filteredPlaces)
+        {
+            var dist = GetCalculatedDistance(place);
+            var isActivity = place.Category == "Activity";
+
+            <div class="place-card" style="@(isActivity ? "border-color:hsla(185, 80%, 50%, .25)" : "")">
+                <div class="place-img-wrap">
+                    @if (!string.IsNullOrEmpty(place.ImageUrl))
+                    {
+                        <img src="@place.ImageUrl" alt="@place.Name" class="place-img" />
+                    }
+                    else
+                    {
+                        <div class="place-img" style="background:var(--grad);opacity:.2"></div>
+                    }
+                    <div class="place-img-overlay"></div>
+                    <div class="place-top-badges">
+                        <span class="place-badge-type" style="@(isActivity ? "background:linear-gradient(135deg, hsla(185,90%,35%,.85), hsla(210,90%,30%,.85));border-color:hsla(185,90%,60%,.4)" : "")">
+                            @(place.Category switch
+                            {
+                                "Bar" => "🍸 Bar & Gece",
+                                "Restaurant" => "🍽️ Restoran",
+                                "Activity" => "🏄‍♂️ Aktivite & Tur",
+                                _ => place.Category
+                            })
+                        </span>
+                        <span class="place-badge-rating">
+                            ★ @place.Rating.ToString("0.0") <small style="color:var(--muted);font-weight:400">(@place.ReviewCount)</small>
+                        </span>
+                    </div>
+
+                    <!-- Kart Üzerinde Belirgin Otele Yakınlık Rozeti -->
+                    <div class="place-proximity-tag @(dist.meters <= 1200 ? "walk" : dist.meters <= 8000 ? "drive" : "tour")">
+                        @if (dist.meters <= 1200)
+                        {
+                            <span>🚶 <b>@dist.meters m</b> @(selectedHotel != null ? selectedHotel.Name + "'e" : "otele") (@dist.walk dk yürüme)</span>
+                        }
+                        else if (dist.meters <= 8000)
+                        {
+                            <span>🚗 <b>@((dist.meters / 1000.0).ToString("0.#")) km</b> @(selectedHotel != null ? selectedHotel.Name + "'e" : "otele") (@dist.drive dk araç)</span>
+                        }
+                        else
+                        {
+                            <span>🚘 <b>@((dist.meters / 1000.0).ToString("0.#")) km</b> @(selectedHotel != null ? selectedHotel.Name + "'e" : "otele") (@dist.drive dk transfer)</span>
+                        }
+                    </div>
+                </div>
+
+                <div class="place-body">
+                    <div class="place-head-row">
+                        <div class="place-name">@place.Name</div>
+                        <div class="place-price-level">@GetPriceSymbols(place.PriceLevel)</div>
+                    </div>
+
+                    <div class="place-subcat">
+                        @place.SubCategory
+                        @if (selectedHotelId == null && place.Hotel != null)
+                        {
+                            <span style="color:var(--accent);font-weight:600"> • 🏨 @place.Hotel.City</span>
+                        }
+                    </div>
+
+                    @if (place.IsPartner && !string.IsNullOrEmpty(place.HotelDiscountNote))
+                    {
+                        <div class="place-partner-banner">
+                            <span>🎁</span>
+                            <span>@place.HotelDiscountNote</span>
+                        </div>
+                    }
+
+                    <!-- Otele Yakınlık Bilgisi (Dinamik Haversine Mesafe) -->
+                    <div class="place-meta-list" style="background:hsla(220,40%,80%,.04);padding:8px 12px;border-radius:10px;margin-bottom:12px">
+                        <span class="place-meta-item" style="color:var(--accent);font-weight:600">
+                            <span>📍</span> @(dist.meters < 1000 ? $"{dist.meters}m" : $"{(dist.meters / 1000.0):0.#} km")
+                            @(selectedHotel != null ? "otele" : "")
+                        </span>
+                        @if (dist.meters <= 1200)
+                        {
+                            <span class="place-meta-item" style="color:var(--ok)">
+                                <span>🚶</span> @dist.walk dk @(L.Lang == "tr" ? "yürüme" : "walk")
+                            </span>
+                        }
+                        else
+                        {
+                            <span class="place-meta-item" style="color:var(--info)">
+                                <span>🚗</span> @dist.drive dk @(L.Lang == "tr" ? "araç / servis" : "drive")
+                            </span>
+                        }
+                        <span class="place-meta-item">
+                            <span>🕒</span> @place.WorkingHours
+                        </span>
+                    </div>
+
+                    <div class="place-desc">
+                        @(L.Lang == "en" && !string.IsNullOrEmpty(place.DescriptionEn) ? place.DescriptionEn : place.Description)
+                    </div>
+
+                    @if (!string.IsNullOrEmpty(place.Specialties))
+                    {
+                        <div class="place-specialty-box" style="@(isActivity ? "border-left-color:hsl(185, 90%, 50%)" : "")">
+                            <b>@(isActivity ? (L.Lang == "tr" ? "Öne Çıkan Rota & Deneyim: " : "Route & Experience: ") : (L.Lang == "tr" ? "Öne Çıkanlar: " : "Highlights: "))</b>@place.Specialties
+                        </div>
+                    }
+
+                    @if (!string.IsNullOrEmpty(place.HighlightFeatures))
+                    {
+                        <div class="place-tags-row">
+                            @foreach (var tag in place.HighlightFeatures.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries).Take(4))
+                            {
+                                <span class="place-pill-tag">#@tag</span>
+                            }
+                        </div>
+                    }
+
+                    <div class="place-actions">
+                        <button class="btn sm" @onclick="() => ShowDetail(place)">
+                            🔍 @(L.Lang == "tr" ? "Detaylar" : "Details")
+                        </button>
+                        <button class="btn sm" @onclick="() => FocusOnMap(place)">
+                            🗺️ @(L.Lang == "tr" ? "Haritada Gör" : "On Map")
+                        </button>
+                        <button class="btn sm" @onclick="() => RecommendPlace(place)">
+                            💬 @(L.Lang == "tr" ? "Öner" : "Recommend")
+                        </button>
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+}
+
+<!-- Detay Modalı -->
+@if (selectedDetailPlace != null)
+{
+    var detailDist = GetCalculatedDistance(selectedDetailPlace);
+
+    <div class="overlay" @onclick="CloseDetail">
+        <div class="modal" @onclick:stopPropagation="true" style="max-width:700px">
+            <div class="modal-head">
+                <div>
+                    <h2>@selectedDetailPlace.Name</h2>
+                    <span class="muted">@selectedDetailPlace.SubCategory @(selectedDetailPlace.Hotel != null ? $" • 🏨 {selectedDetailPlace.Hotel.Name}" : "")</span>
+                </div>
+                <button class="x" @onclick="CloseDetail">✕</button>
+            </div>
+
+            @if (!string.IsNullOrEmpty(selectedDetailPlace.ImageUrl))
+            {
+                <div style="border-radius:14px;overflow:hidden;height:240px;margin-bottom:18px">
+                    <img src="@selectedDetailPlace.ImageUrl" alt="@selectedDetailPlace.Name" style="width:100%;height:100%;object-fit:cover" />
+                </div>
+            }
+
+            @if (selectedDetailPlace.IsPartner && !string.IsNullOrEmpty(selectedDetailPlace.HotelDiscountNote))
+            {
+                <div class="place-partner-banner" style="font-size:.9rem;padding:10px 16px;margin-bottom:18px">
+                    <span>🎁</span>
+                    <div>
+                        <b>@(L.Lang == "tr" ? "Otel Misafir Ayrıcalığı:" : "Hotel Guest Privilege:")</b>
+                        <div>@selectedDetailPlace.HotelDiscountNote</div>
+                    </div>
+                </div>
+            }
+
+            <div class="card" style="margin-bottom:18px;background:hsla(220,40%,80%,.03)">
+                <div class="grid g2">
+                    <div>
+                        <div class="muted" style="font-size:.78rem">@(L.Lang == "tr" ? "BAĞLI OLDUĞU OTEL" : "HOTEL PROPERTY")</div>
+                        <div style="font-weight:600;margin-top:2px">🏨 @(selectedDetailPlace.Hotel?.Name ?? "Otel")</div>
+                    </div>
+                    <div>
+                        <div class="muted" style="font-size:.78rem">@(L.Lang == "tr" ? "OTELE ULAŞIM & MESAFE" : "HOTEL DISTANCE")</div>
+                        <div style="font-weight:600;margin-top:2px;color:var(--accent)">
+                            📍 @(detailDist.meters < 1000 ? $"{detailDist.meters}m" : $"{(detailDist.meters / 1000.0):0.#} km")
+                            @(detailDist.meters <= 1200 ? $" • 🚶 {detailDist.walk} dk yürüme" : $" • 🚗 {detailDist.drive} dk araç / servis")
+                        </div>
+                    </div>
+                    <div>
+                        <div class="muted" style="font-size:.78rem">@(L.Lang == "tr" ? "ÇALIŞMA / TUR SAATLERİ" : "HOURS")</div>
+                        <div style="font-weight:600;margin-top:2px">🕒 @selectedDetailPlace.WorkingHours</div>
+                    </div>
+                    <div>
+                        <div class="muted" style="font-size:.78rem">@(L.Lang == "tr" ? "FİYAT & PUAN" : "PRICE & RATING")</div>
+                        <div style="font-weight:600;margin-top:2px">
+                            <span style="color:var(--accent)">@GetPriceSymbols(selectedDetailPlace.PriceLevel)</span> • <span style="color:#ffd159">★ @selectedDetailPlace.Rating.ToString("0.0")</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <p style="line-height:1.6;font-size:.92rem;margin-bottom:16px">
+                @selectedDetailPlace.Description
+            </p>
+
+            @if (!string.IsNullOrEmpty(selectedDetailPlace.Specialties))
+            {
+                <div class="place-specialty-box" style="margin-bottom:16px">
+                    <b>@(selectedDetailPlace.Category == "Activity" ? (L.Lang == "tr" ? "Tavsiye Edilen Aktivite & Rota:" : "Recommended Experience:") : (L.Lang == "tr" ? "Tavsiye Edilen Lezzetler:" : "Specialties:"))</b><br />
+                    @selectedDetailPlace.Specialties
+                </div>
+            }
+
+            <div style="margin-bottom:20px;padding:12px;background:hsla(220,40%,80%,.04);border-radius:12px">
+                <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+                    <span>📌</span> <b>@(L.Lang == "tr" ? "Adres:" : "Address:")</b> <span>@selectedDetailPlace.Address</span>
+                </div>
+                <div style="display:flex;align-items:center;gap:8px">
+                    <span>📞</span> <b>@(L.Lang == "tr" ? "İletişim & Rezervasyon:" : "Phone:")</b>
+                    <a href="tel:@selectedDetailPlace.Phone" style="color:var(--accent);font-weight:600">@selectedDetailPlace.Phone</a>
+                </div>
+            </div>
+
+            <div style="display:flex;gap:10px;justify-content:flex-end">
+                <button class="btn" @onclick="() => FocusOnMap(selectedDetailPlace)">🗺️ @(L.Lang == "tr" ? "Haritada Göster" : "Show on Map")</button>
+                <button class="btn" @onclick="() => RecommendPlace(selectedDetailPlace)">💬 @(L.Lang == "tr" ? "Misafire Öner" : "Recommend to Guest")</button>
+                @if (!string.IsNullOrEmpty(selectedDetailPlace.GoogleMapsUrl))
+                {
+                    <a class="btn primary" href="@selectedDetailPlace.GoogleMapsUrl" target="_blank" rel="noopener noreferrer">
+                        ↗ @(L.Lang == "tr" ? "Google Haritalar" : "Google Maps")
+                    </a>
+                }
+            </div>
+        </div>
+    </div>
+}
+
+<!-- Concierge Misafir Tavsiye Modalı -->
+@if (showConciergeModal)
+{
+    <div class="overlay" @onclick="() => showConciergeModal = false">
+        <div class="modal" @onclick:stopPropagation="true" style="max-width:640px">
+            <div class="modal-head">
+                <div>
+                    <h2>💬 @(L.Lang == "tr" ? "Misafire Öneri Mesajı Gönder" : "Send Recommendation to Guest")</h2>
+                    <span class="muted">@(selectedHotel != null ? selectedHotel.Name : "Otel") @(L.Lang == "tr" ? "Ön büro hızlı öneri aracı" : "Concierge generator")</span>
+                </div>
+                <button class="x" @onclick="() => showConciergeModal = false">✕</button>
+            </div>
+
+            <div style="margin-bottom:14px">
+                <label class="f">@(L.Lang == "tr" ? "Oteldeki Misafir Seçin (Veya Özel İsim Yazın)" : "Select In-House Guest")</label>
+                <select @bind="selectedGuestId" @bind:after="OnGuestSelected" style="width:100%">
+                    <option value="0">@(L.Lang == "tr" ? "-- Misafir Listesinden Seç --" : "-- Select In-House Guest --")</option>
+                    @foreach (var g in inHouseGuests)
+                    {
+                        <option value="@g.Id">@g.FullName (@g.RoomNumber) - @g.Phone</option>
+                    }
+                </select>
+            </div>
+
+            <div class="grid g2" style="margin-bottom:14px">
+                <div>
+                    <label class="f">@(L.Lang == "tr" ? "Misafir Adı" : "Guest Name")</label>
+                    <input type="text" @bind="guestName" @bind:after="GenerateRecommendationText" />
+                </div>
+                <div>
+                    <label class="f">@(L.Lang == "tr" ? "Oda Numarası" : "Room Number")</label>
+                    <input type="text" @bind="guestRoomNumber" @bind:after="GenerateRecommendationText" />
+                </div>
+            </div>
+
+            <div style="margin-bottom:14px">
+                <label class="f">@(L.Lang == "tr" ? "Önerilecek Mekan veya Aktivite" : "Place to Recommend")</label>
+                <select @bind="conciergePlaceId" @bind:after="OnConciergePlaceChanged">
+                    @if (filteredPlaces != null)
+                    {
+                        @foreach (var p in filteredPlaces)
+                        {
+                            <option value="@p.Id">@p.Name (@p.Category - @p.SubCategory)</option>
+                        }
+                    }
+                </select>
+            </div>
+
+            <div>
+                <label class="f">@(L.Lang == "tr" ? "Oluşturulan Kişisel VIP Mesajı" : "Generated Concierge Message")</label>
+                <div class="concierge-rec-box">@conciergeGeneratedText</div>
+            </div>
+
+            <div style="display:flex;gap:10px;justify-content:space-between;align-items:center;margin-top:18px">
+                <div>
+                    @if (copiedToast)
+                    {
+                        <span style="color:var(--ok);font-size:.85rem;font-weight:600">✓ @(L.Lang == "tr" ? "Mesaj panoya kopyalandı!" : "Copied to clipboard!")</span>
+                    }
+                </div>
+                <div style="display:flex;gap:10px">
+                    <button class="btn" @onclick="CopyMessageToClipboard">📋 @(L.Lang == "tr" ? "Panoya Kopyala" : "Copy")</button>
+                    <a class="btn primary" href="@GetWhatsAppUrl()" target="_blank" rel="noopener noreferrer">
+                        🟢 @(L.Lang == "tr" ? "WhatsApp ile Gönder" : "Send via WhatsApp")
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- Yeni Otel Ekleme Modalı -->
+@if (showAddHotelModal)
+{
+    <div class="overlay" @onclick="() => showAddHotelModal = false">
+        <div class="modal" @onclick:stopPropagation="true" style="max-width:640px">
+            <div class="modal-head">
+                <div>
+                    <h2>🏨 @(L.Lang == "tr" ? "Yeni Otel İşletmesi Ekle" : "Add New Hotel Property")</h2>
+                    <span class="muted">@(L.Lang == "tr" ? "Zincir işletmeye yeni bir otel tesisi ve konumu tanımlayın" : "Register a new enterprise hotel branch")</span>
+                </div>
+                <button class="x" @onclick="() => showAddHotelModal = false">✕</button>
+            </div>
+
+            <div class="grid g2" style="margin-bottom:14px">
+                <div>
+                    <label class="f">@(L.Lang == "tr" ? "Otel Adı *" : "Hotel Name *")</label>
+                    <input type="text" @bind="newHotel.Name" placeholder="Örn: Blue Pearl Luxury Resort" />
+                </div>
+                <div>
+                    <label class="f">@(L.Lang == "tr" ? "Şehir / Bölge *" : "City / Region *")</label>
+                    <input type="text" @bind="newHotel.City" placeholder="Örn: Muğla / Marmaris" />
+                </div>
+            </div>
+
+            <div style="margin-bottom:14px">
+                <label class="f">@(L.Lang == "tr" ? "Açık Adres" : "Address")</label>
+                <input type="text" @bind="newHotel.Address" placeholder="Örn: Siteler Mah. 204 Sk. No:10, Marmaris" />
+            </div>
+
+            <div class="grid g3" style="margin-bottom:14px">
+                <div>
+                    <label class="f">@(L.Lang == "tr" ? "Telefon" : "Phone")</label>
+                    <input type="text" @bind="newHotel.Phone" placeholder="+90 252 412 00 00" />
+                </div>
+                <div>
+                    <label class="f">@(L.Lang == "tr" ? "Yıldız Sayısı" : "Stars")</label>
+                    <select @bind="newHotel.Stars">
+                        <option value="3">3 Yıldız</option>
+                        <option value="4">4 Yıldız</option>
+                        <option value="5">5 Yıldız</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="f">@(L.Lang == "tr" ? "Vergi No" : "Tax ID")</label>
+                    <input type="text" @bind="newHotel.TaxId" placeholder="1234567890" />
+                </div>
+            </div>
+
+            <div class="card" style="background:hsla(220,40%,80%,.04);margin-bottom:18px">
+                <div style="font-size:.82rem;font-weight:700;color:var(--accent);margin-bottom:10px">📍 HARİTA COĞRAFİ KONUMU (ENLEM / BOYLAM)</div>
+                <div class="grid g2">
+                    <div>
+                        <label class="f">@(L.Lang == "tr" ? "Enlem (Latitude) *" : "Latitude *")</label>
+                        <input type="number" step="0.0001" @bind="newHotel.Latitude" placeholder="36.8500" />
+                    </div>
+                    <div>
+                        <label class="f">@(L.Lang == "tr" ? "Boylam (Longitude) *" : "Longitude *")</label>
+                        <input type="number" step="0.0001" @bind="newHotel.Longitude" placeholder="28.2700" />
+                    </div>
+                </div>
+            </div>
+
+            @if (!string.IsNullOrEmpty(hotelFormError))
+            {
+                <div class="alert bad">@hotelFormError</div>
+            }
+
+            <div style="display:flex;justify-content:flex-end;gap:10px">
+                <button class="btn" @onclick="() => showAddHotelModal = false">@(L.Lang == "tr" ? "İptal" : "Cancel")</button>
+                <button class="btn primary" @onclick="SaveNewHotel">✓ @(L.Lang == "tr" ? "Oteli Kaydet & Haritaya Ekle" : "Save Hotel")</button>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- Yeni Mekan / Aktivite Ekleme Modalı -->
+@if (showAddPlaceModal)
+{
+    <div class="overlay" @onclick="() => showAddPlaceModal = false">
+        <div class="modal" @onclick:stopPropagation="true" style="max-width:680px">
+            <div class="modal-head">
+                <div>
+                    <h2>➕ @(L.Lang == "tr" ? "Yeni Mekan veya Aktivite Ekle" : "Add New Place or Tour")</h2>
+                    <span class="muted">@(L.Lang == "tr" ? "Otele yakın yeni bir bar, restoran veya tur kaydedin" : "Register a local bar, restaurant, or activity")</span>
+                </div>
+                <button class="x" @onclick="() => showAddPlaceModal = false">✕</button>
+            </div>
+
+            <div style="margin-bottom:14px">
+                <label class="f">@(L.Lang == "tr" ? "Bağlı Olduğu Otel Tesisi *" : "Associated Hotel *")</label>
+                <select @bind="newPlace.HotelId">
+                    @foreach (var h in hotels)
+                    {
+                        <option value="@h.Id">🏨 @h.Name (@h.City)</option>
+                    }
+                </select>
+            </div>
+
+            <div class="grid g2" style="margin-bottom:14px">
+                <div>
+                    <label class="f">@(L.Lang == "tr" ? "Mekan / Aktivite Adı *" : "Name *")</label>
+                    <input type="text" @bind="newPlace.Name" placeholder="Örn: Marina Sunset Bar" />
+                </div>
+                <div>
+                    <label class="f">@(L.Lang == "tr" ? "Kategori *" : "Category *")</label>
+                    <select @bind="newPlace.Category">
+                        <option value="Activity">🏄‍♂️ Aktivite & Tur</option>
+                        <option value="Restaurant">🍽️ Restoran & Yeme-İçme</option>
+                        <option value="Bar">🍸 Bar & Gece Hayatı</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="grid g2" style="margin-bottom:14px">
+                <div>
+                    <label class="f">@(L.Lang == "tr" ? "Alt Kategori / Konsept" : "Subcategory / Concept")</label>
+                    <input type="text" @bind="newPlace.SubCategory" placeholder="Örn: Özel Yat Turu & Şnorkel" />
+                </div>
+                <div>
+                    <label class="f">@(L.Lang == "tr" ? "Otele Mesafe (Metre Olarak) *" : "Distance (Meters) *")</label>
+                    <input type="number" @bind="newPlace.DistanceMeters" placeholder="350" />
+                </div>
+            </div>
+
+            <div class="card" style="background:hsla(220,40%,80%,.04);margin-bottom:14px">
+                <div style="font-size:.82rem;font-weight:700;color:var(--accent);margin-bottom:10px">📍 HARİTA KONUMU</div>
+                <div class="grid g2">
+                    <div>
+                        <label class="f">Enlem (Latitude)</label>
+                        <input type="number" step="0.0001" @bind="newPlace.Latitude" placeholder="37.0340" />
+                    </div>
+                    <div>
+                        <label class="f">Boylam (Longitude)</label>
+                        <input type="number" step="0.0001" @bind="newPlace.Longitude" placeholder="27.4300" />
+                    </div>
+                </div>
+            </div>
+
+            <div class="grid g3" style="margin-bottom:14px">
+                <div>
+                    <label class="f">@(L.Lang == "tr" ? "Yürüme Süresi (Dk)" : "Walk (Minutes)")</label>
+                    <input type="number" @bind="newPlace.WalkingTimeMinutes" placeholder="5" />
+                </div>
+                <div>
+                    <label class="f">@(L.Lang == "tr" ? "Fiyat Seviyesi (1-4)" : "Price Level (1-4)")</label>
+                    <select @bind="newPlace.PriceLevel">
+                        <option value="1">₺ (Ekonomik)</option>
+                        <option value="2">₺₺ (Orta)</option>
+                        <option value="3">₺₺₺ (Seçkin)</option>
+                        <option value="4">₺₺₺₺ (Lüks)</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="f">@(L.Lang == "tr" ? "Puan (1.0 - 5.0)" : "Rating (1.0 - 5.0)")</label>
+                    <input type="number" step="0.1" @bind="newPlace.Rating" placeholder="4.9" />
+                </div>
+            </div>
+
+            <div class="grid g2" style="margin-bottom:14px">
+                <div>
+                    <label class="f">@(L.Lang == "tr" ? "Çalışma / Tur Saatleri" : "Hours")</label>
+                    <input type="text" @bind="newPlace.WorkingHours" placeholder="09:30 - 18:00" />
+                </div>
+                <div>
+                    <label class="f">@(L.Lang == "tr" ? "Telefon Numarası" : "Phone")</label>
+                    <input type="text" @bind="newPlace.Phone" placeholder="+90 252 316 00 00" />
+                </div>
+            </div>
+
+            <div style="margin-bottom:14px">
+                <label class="f">@(L.Lang == "tr" ? "Adres" : "Address")</label>
+                <input type="text" @bind="newPlace.Address" placeholder="Yat Limanı 3 Nolu İskele" />
+            </div>
+
+            <div style="margin-bottom:14px">
+                <label class="f">@(L.Lang == "tr" ? "Öne Çıkan Lezzetler / Rota" : "Specialties")</label>
+                <input type="text" @bind="newPlace.Specialties" placeholder="Akvaryum Koyu, Karaada Mağarası, Şnorkel..." />
+            </div>
+
+            <div style="margin-bottom:14px">
+                <label style="display:flex;align-items:center;gap:10px;cursor:pointer">
+                    <input type="checkbox" @bind="newPlace.IsPartner" />
+                    <b>@(L.Lang == "tr" ? "Otel ile Anlaşmalı / Partner Mekan" : "Hotel Partner Venue")</b>
+                </label>
+                @if (newPlace.IsPartner)
+                {
+                    <div style="margin-top:8px">
+                        <input type="text" @bind="newPlace.HotelDiscountNote" placeholder="Örn: Otel Misafirlerine %20 İndirim & Ücretsiz Transfer" />
+                    </div>
+                }
+            </div>
+
+            <div style="margin-bottom:14px">
+                <label class="f">@(L.Lang == "tr" ? "Açıklama" : "Description")</label>
+                <textarea rows="3" @bind="newPlace.Description" placeholder="Aktivite veya mekan hakkında detaylı bilgi..."></textarea>
+            </div>
+
+            <div class="grid g2" style="margin-bottom:20px">
+                <div>
+                    <label class="f">@(L.Lang == "tr" ? "Görsel Seçimi" : "Image")</label>
+                    <select @bind="newPlace.ImageUrl">
+                        <option value="/images/boat_tour.jpg">⛵ Tekne & Yat Turu (boat_tour.jpg)</option>
+                        <option value="/images/aegean_dining.jpg">🐟 Ege Deniz Kenarı Restoran (aegean_dining.jpg)</option>
+                        <option value="/images/sunset_bar.jpg">🌅 Gün Batımı Bar & Lounge (sunset_bar.jpg)</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="f">@(L.Lang == "tr" ? "Google Haritalar Linki" : "Google Maps URL")</label>
+                    <input type="text" @bind="newPlace.GoogleMapsUrl" placeholder="https://maps.google.com/..." />
+                </div>
+            </div>
+
+            @if (!string.IsNullOrEmpty(placeFormError))
+            {
+                <div class="alert bad">@placeFormError</div>
+            }
+
+            <div style="display:flex;justify-content:flex-end;gap:10px">
+                <button class="btn" @onclick="() => showAddPlaceModal = false">@(L.Lang == "tr" ? "İptal" : "Cancel")</button>
+                <button class="btn primary" @onclick="SaveNewPlace">✓ @(L.Lang == "tr" ? "Kaydet & Yayınla" : "Save & Publish")</button>
+            </div>
+        </div>
+    </div>
+}
+</div>
+
+@code {
+    List<Hotel> hotels = new();
+    int? selectedHotelId = null;
+    Hotel? selectedHotel;
+
+    List<NearbyPlace> allPlaces = new();
+    List<NearbyPlace> filteredPlaces = new();
+    NearbyStats? stats;
+    bool loading = true;
+
+    string mapViewMode = "split"; // split, large, only-list
+    string currentCat = "Activity"; // Varsayılan olarak Aktiviteler açık olsun
+    string activitySubcat = "All";
+    int allNearSelectedCount = 0;
+    int distFilter = 0;
+    int priceFilter = 0;
+    bool onlyPartners = false;
+    string searchTerm = "";
+
+    // Modals
+    NearbyPlace? selectedDetailPlace;
+    bool showConciergeModal = false;
+    bool showAddPlaceModal = false;
+    bool showAddHotelModal = false;
+
+    // Concierge data
+    record GuestOption(int Id, string FullName, string RoomNumber, string Phone);
+    List<GuestOption> inHouseGuests = new();
+    int selectedGuestId = 0;
+    string guestName = "Sayın Misafirimiz";
+    string guestRoomNumber = "";
+    string guestPhone = "";
+    int conciergePlaceId = 0;
+    string conciergeGeneratedText = "";
+    bool copiedToast = false;
+
+    // Add Place Form
+    NearbyPlace newPlace = new()
+    {
+        Category = "Activity",
+        PriceLevel = 3,
+        Rating = 4.9m,
+        ReviewCount = 120,
+        ImageUrl = "/images/boat_tour.jpg",
+        WorkingHours = "09:30 - 18:00"
+    };
+    string placeFormError = "";
+
+    // Add Hotel Form
+    Hotel newHotel = new()
+    {
+        Stars = 5,
+        Latitude = 36.8500,
+        Longitude = 28.2700,
+        ImageUrl = "/hero.jpg"
+    };
+    string hotelFormError = "";
+
+    DotNetObjectReference<Nearby>? dotNetRef;
+    bool mapInitialized = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        dotNetRef = DotNetObjectReference.Create(this);
+        await LoadDataAsync();
+        await LoadInHouseGuestsAsync();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && !mapInitialized && mapViewMode != "only-list")
+        {
+            await Task.Delay(300);
+            await InitializeMapAsync();
+        }
+    }
+
+    async Task LoadDataAsync()
+    {
+        loading = true;
+        try
+        {
+            hotels = await NearbySvc.GetHotelsAsync();
+            if (CurrentHotelState.SelectedHotelId > 0 && hotels.Any(h => h.Id == CurrentHotelState.SelectedHotelId))
+            {
+                selectedHotelId = CurrentHotelState.SelectedHotelId;
+                selectedHotel = hotels.FirstOrDefault(h => h.Id == CurrentHotelState.SelectedHotelId);
+            }
+            else if (hotels.Count > 0 && selectedHotelId == null)
+            {
+                selectedHotelId = hotels[0].Id;
+                selectedHotel = hotels[0];
+            }
+
+            allPlaces = await NearbySvc.GetAllAsync();
+            stats = await NearbySvc.GetStatsAsync(selectedHotelId);
+            ApplyFilters();
+
+            if (mapInitialized)
+            {
+                await SyncMapAsync();
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading nearby: {ex.Message}");
+        }
+        finally
+        {
+            loading = false;
+        }
+    }
+
+    async Task InitializeMapAsync()
+    {
+        try
+        {
+            double lat = selectedHotel?.Latitude ?? 39.0;
+            double lng = selectedHotel?.Longitude ?? 35.0;
+            int zoom = selectedHotel != null ? 13 : 6;
+
+            await JS.InvokeVoidAsync("initLeafletMap", "nearbyMap", dotNetRef, lat, lng, zoom);
+            mapInitialized = true;
+            await SyncMapAsync();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Map init error: {ex.Message}");
+        }
+    }
+
+    async Task SyncMapAsync()
+    {
+        if (!mapInitialized || mapViewMode == "only-list") return;
+        try
+        {
+            var mapHotels = hotels.Select(h => new
+            {
+                id = h.Id,
+                name = h.Name,
+                city = h.City,
+                address = h.Address,
+                stars = h.Stars,
+                latitude = h.Latitude,
+                longitude = h.Longitude
+            }).ToList();
+
+            var mapPlaces = filteredPlaces.Select(p => new
+            {
+                id = p.Id,
+                name = p.Name,
+                category = p.Category,
+                subCategory = p.SubCategory,
+                rating = p.Rating,
+                priceLevel = p.PriceLevel,
+                distanceMeters = GetCalculatedDistance(p).meters,
+                isPartner = p.IsPartner,
+                imageUrl = p.ImageUrl,
+                latitude = p.Latitude,
+                longitude = p.Longitude
+            }).ToList();
+
+            await JS.InvokeVoidAsync("updateMapData", mapHotels, mapPlaces, selectedHotelId);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Map sync error: {ex.Message}");
+        }
+    }
+
+    async Task SelectHotel(int? hotelId)
+    {
+        selectedHotelId = hotelId;
+        selectedHotel = hotels.FirstOrDefault(h => h.Id == hotelId);
+        if (hotelId.HasValue)
+        {
+            await CurrentHotelState.SetHotelAsync(hotelId.Value);
+        }
+        stats = await NearbySvc.GetStatsAsync(selectedHotelId);
+        ApplyFilters();
+        await SyncMapAsync();
+        await LoadInHouseGuestsAsync();
+    }
+
+    [JSInvokable]
+    public async Task OnHotelSelectedFromMap(int hotelId)
+    {
+        await SelectHotel(hotelId);
+        StateHasChanged();
+    }
+
+    [JSInvokable]
+    public void OnPlaceSelectedFromMap(int placeId)
+    {
+        var p = allPlaces.FirstOrDefault(x => x.Id == placeId);
+        if (p != null)
+        {
+            ShowDetail(p);
+            StateHasChanged();
+        }
+    }
+
+    async Task FocusHotelOnMap(Hotel h)
+    {
+        if (h.Latitude.HasValue && h.Longitude.HasValue)
+        {
+            if (mapViewMode == "only-list")
+                mapViewMode = "split";
+
+            await Task.Delay(100);
+            if (!mapInitialized)
+                await InitializeMapAsync();
+
+            await JS.InvokeVoidAsync("focusMapLocation", h.Latitude.Value, h.Longitude.Value, 14);
+        }
+    }
+
+    async Task FocusOnMap(NearbyPlace p)
+    {
+        if (p.Latitude.HasValue && p.Longitude.HasValue)
+        {
+            if (mapViewMode == "only-list")
+                mapViewMode = "split";
+
+            await Task.Delay(100);
+            if (!mapInitialized)
+                await InitializeMapAsync();
+
+            await JS.InvokeVoidAsync("highlightPlaceMarker", p.Id);
+        }
+    }
+
+    async Task SetMapMode(string mode)
+    {
+        mapViewMode = mode;
+        if (mode != "only-list")
+        {
+            await Task.Delay(200);
+            if (!mapInitialized)
+                await InitializeMapAsync();
+            else
+                await SyncMapAsync();
+        }
+    }
+
+    void SetCategory(string cat)
+    {
+        currentCat = cat;
+        activitySubcat = "All";
+        ApplyFilters();
+        _ = SyncMapAsync();
+    }
+
+    void SetActivitySubcat(string subcat)
+    {
+        activitySubcat = subcat;
+        ApplyFilters();
+        _ = SyncMapAsync();
+    }
+
+    void TogglePartners()
+    {
+        onlyPartners = !onlyPartners;
+        ApplyFilters();
+        _ = SyncMapAsync();
+    }
+
+    // Seçili otele göre dinamik Haversine mesafe hesaplaması
+    (int meters, int walk, int drive) GetCalculatedDistance(NearbyPlace place)
+    {
+        if (selectedHotel?.Latitude != null && selectedHotel?.Longitude != null &&
+            place.Latitude.HasValue && place.Longitude.HasValue)
+        {
+            double dLat = (place.Latitude.Value - selectedHotel.Latitude.Value) * Math.PI / 180.0;
+            double dLon = (place.Longitude.Value - selectedHotel.Longitude.Value) * Math.PI / 180.0;
+            double lat1 = selectedHotel.Latitude.Value * Math.PI / 180.0;
+            double lat2 = place.Latitude.Value * Math.PI / 180.0;
+
+            double a = Math.Sin(dLat / 2) * Math.Sin(dLat / 2) +
+                       Math.Cos(lat1) * Math.Cos(lat2) *
+                       Math.Sin(dLon / 2) * Math.Sin(dLon / 2);
+            double c = 2 * Math.Atan2(Math.Sqrt(a), Math.Sqrt(1 - a));
+            int distMeters = (int)Math.Round(6371000 * c);
+
+            int walkMins = Math.Max(1, (int)Math.Round(distMeters / 80.0));
+            int driveMins = Math.Max(1, (int)Math.Round(distMeters / 550.0));
+
+            return (distMeters, walkMins, driveMins);
+        }
+
+        // Fallback to static distance
+        int fallbackWalk = place.WalkingTimeMinutes > 0 ? place.WalkingTimeMinutes : Math.Max(1, place.DistanceMeters / 80);
+        int fallbackDrive = Math.Max(1, place.DistanceMeters / 550);
+        return (place.DistanceMeters, fallbackWalk, fallbackDrive);
+    }
+
+    void ApplyFilters()
+    {
+        var q = allPlaces.AsEnumerable();
+
+        if (selectedHotelId.HasValue && selectedHotelId.Value > 0)
+        {
+            q = q.Where(p => p.HotelId == selectedHotelId.Value);
+            allNearSelectedCount = allPlaces.Count(p => p.HotelId == selectedHotelId.Value);
+        }
+        else
+        {
+            allNearSelectedCount = allPlaces.Count;
+        }
+
+        if (currentCat != "All")
+            q = q.Where(p => p.Category == currentCat);
+
+        if (activitySubcat != "All" && (currentCat == "Activity" || currentCat == "All"))
+        {
+            q = activitySubcat switch
+            {
+                "Sea" => q.Where(p => p.SubCategory.Contains("Tekne") || p.SubCategory.Contains("Su Spor") || p.SubCategory.Contains("Dalış") || p.SubCategory.Contains("Sörf") || p.SubCategory.Contains("SUP") || p.SubCategory.Contains("Kano") || p.SubCategory.Contains("Yüzme") || p.SubCategory.Contains("Deniz")),
+                "Nature" => q.Where(p => p.SubCategory.Contains("Balon") || p.SubCategory.Contains("Safari") || p.SubCategory.Contains("Rafting") || p.SubCategory.Contains("Doğa") || p.SubCategory.Contains("Teleferik") || p.SubCategory.Contains("Atlı") || p.SubCategory.Contains("Adrenalin") || p.SubCategory.Contains("Kanyon") || p.SubCategory.Contains("Dağ")),
+                "Culture" => q.Where(p => p.SubCategory.Contains("Tarih") || p.SubCategory.Contains("Kültür") || p.SubCategory.Contains("Müze") || p.SubCategory.Contains("Saray") || p.SubCategory.Contains("Arkeoloji") || p.SubCategory.Contains("Yeraltı") || p.SubCategory.Contains("Sanat") || p.SubCategory.Contains("Şehir") || p.SubCategory.Contains("Kale") || p.SubCategory.Contains("Çömlek")),
+                "Spa" => q.Where(p => p.SubCategory.Contains("Hamam") || p.SubCategory.Contains("Spa") || p.SubCategory.Contains("Termal") || p.SubCategory.Contains("Çamur")),
+                _ => q
+            };
+        }
+
+        if (onlyPartners)
+            q = q.Where(p => p.IsPartner);
+
+        if (priceFilter > 0)
+            q = q.Where(p => p.PriceLevel == priceFilter);
+
+        if (!string.IsNullOrWhiteSpace(searchTerm))
+        {
+            var s = searchTerm.Trim().ToLower();
+            q = q.Where(p =>
+                p.Name.ToLower().Contains(s) ||
+                p.SubCategory.ToLower().Contains(s) ||
+                p.Description.ToLower().Contains(s) ||
+                (p.Specialties != null && p.Specialties.ToLower().Contains(s)) ||
+                (p.HighlightFeatures != null && p.HighlightFeatures.ToLower().Contains(s)) ||
+                (p.Hotel != null && p.Hotel.City.ToLower().Contains(s)));
+        }
+
+        // Seçili otele olan gerçek mesafeye göre sırala
+        var list = q.Select(p => new { Place = p, Dist = GetCalculatedDistance(p) });
+
+        if (distFilter > 0)
+        {
+            list = list.Where(x => x.Dist.meters <= distFilter);
+        }
+
+        filteredPlaces = list.OrderBy(x => x.Dist.meters).ThenByDescending(x => x.Place.Rating).Select(x => x.Place).ToList();
+    }
+
+    void ResetFilters()
+    {
+        currentCat = "Activity";
+        activitySubcat = "All";
+        distFilter = 0;
+        priceFilter = 0;
+        onlyPartners = false;
+        searchTerm = "";
+        ApplyFilters();
+        _ = SyncMapAsync();
+    }
+
+    static string GetPriceSymbols(int level) => level switch
+    {
+        1 => "₺",
+        2 => "₺₺",
+        3 => "₺₺₺",
+        4 => "₺₺₺₺",
+        _ => "₺₺"
+    };
+
+    void ShowDetail(NearbyPlace p)
+    {
+        selectedDetailPlace = p;
+    }
+
+    void CloseDetail()
+    {
+        selectedDetailPlace = null;
+    }
+
+    void RecommendPlace(NearbyPlace p)
+    {
+        conciergePlaceId = p.Id;
+        if (selectedDetailPlace != null) selectedDetailPlace = null;
+        showConciergeModal = true;
+        GenerateRecommendationText();
+    }
+
+    void OpenConciergeModal()
+    {
+        if (conciergePlaceId == 0 && filteredPlaces.Count > 0)
+            conciergePlaceId = filteredPlaces[0].Id;
+        showConciergeModal = true;
+        GenerateRecommendationText();
+    }
+
+    async Task LoadInHouseGuestsAsync()
+    {
+        try
+        {
+            await using var db = await DbFactory.CreateDbContextAsync();
+            var q = db.Reservations
+                .Include(r => r.Guest)
+                .Include(r => r.Rooms).ThenInclude(rm => rm.Room)
+                .Where(r => r.Status == ResStatus.CheckedIn);
+
+            if (selectedHotelId.HasValue)
+            {
+                q = q.Where(r => r.Rooms.Any(rm => rm.Room != null && rm.Room.HotelId == selectedHotelId.Value));
+            }
+
+            var res = await q.Take(25).ToListAsync();
+
+            inHouseGuests = res
+                .Where(r => r.Guest != null)
+                .Select(r => new GuestOption(
+                    r.Guest!.Id,
+                    $"{r.Guest.FirstName} {r.Guest.LastName}",
+                    r.Rooms.FirstOrDefault()?.Room?.Number ?? "Oda ?",
+                    r.Guest.Phone ?? ""
+                ))
+                .ToList();
+        }
+        catch
+        {
+            // fallback
+        }
+    }
+
+    void OnGuestSelected()
+    {
+        var g = inHouseGuests.FirstOrDefault(x => x.Id == selectedGuestId);
+        if (g != null)
+        {
+            guestName = g.FullName;
+            guestRoomNumber = g.RoomNumber;
+            guestPhone = g.Phone;
+        }
+        GenerateRecommendationText();
+    }
+
+    void OnConciergePlaceChanged()
+    {
+        GenerateRecommendationText();
+    }
+
+    void GenerateRecommendationText()
+    {
+        var place = allPlaces.FirstOrDefault(p => p.Id == conciergePlaceId) ?? allPlaces.FirstOrDefault();
+        if (place == null) return;
+
+        var dist = GetCalculatedDistance(place);
+        string hotelTitle = selectedHotel?.Name ?? place.Hotel?.Name ?? "Otel";
+        string roomInfo = string.IsNullOrWhiteSpace(guestRoomNumber) ? "" : $" (Oda {guestRoomNumber})";
+        string discountPart = place.IsPartner && !string.IsNullOrEmpty(place.HotelDiscountNote)
+            ? $"\n\n🎁 Otel Misafirlerimize Özel Ayrıcalık: {place.HotelDiscountNote}"
+            : "";
+
+        string distanceStr = dist.meters < 1000 ? $"{dist.meters} metre" : $"{(dist.meters / 1000.0):0.#} km";
+        string timeStr = dist.meters <= 1200 ? $" (Yürüyerek yaklaşık {dist.walk} dakika)" : $" (Araç / transfer ile yaklaşık {dist.drive} dakika)";
+
+        conciergeGeneratedText =
+            $"Sayın {guestName}{roomInfo},\n\n" +
+            $"{hotelTitle} Ön Büro & Concierge ekibimiz olarak gününüzü unutulmaz kılacak harika bir aktivite ve mekan önerimiz var:\n\n" +
+            $"🌟 {place.Name} ({place.SubCategory})\n" +
+            $"📍 Mesafe: Otelimize {distanceStr}{timeStr}\n" +
+            $"🕒 Tur / Çalışma Saatleri: {place.WorkingHours}\n" +
+            $"📞 İletişim: {place.Phone}\n" +
+            $"✨ Öne Çıkanlar: {place.Specialties ?? place.Description}" +
+            $"{discountPart}\n\n" +
+            $"Haritada Aç: {place.GoogleMapsUrl}\n\n" +
+            $"Rezervasyon yaptırmak veya transfer talep etmek isterseniz resepsiyonumuzla dilediğiniz zaman iletişime geçebilirsiniz! 🌴🌊";
+    }
+
+    async Task CopyMessageToClipboard()
+    {
+        try
+        {
+            await JS.InvokeVoidAsync("navigator.clipboard.writeText", conciergeGeneratedText);
+            copiedToast = true;
+            StateHasChanged();
+            await Task.Delay(2500);
+            copiedToast = false;
+            StateHasChanged();
+        }
+        catch
+        {
+            // fallback
+        }
+    }
+
+    string GetWhatsAppUrl()
+    {
+        string text = Uri.EscapeDataString(conciergeGeneratedText);
+        string phoneClean = new string(guestPhone.Where(char.IsDigit).ToArray());
+        return string.IsNullOrEmpty(phoneClean) ? $"https://wa.me/?text={text}" : $"https://wa.me/{phoneClean}?text={text}";
+    }
+
+    void OpenAddHotelModal()
+    {
+        newHotel = new Hotel
+        {
+            Stars = 5,
+            Latitude = selectedHotel?.Latitude ?? 36.8500,
+            Longitude = selectedHotel?.Longitude ?? 28.2700,
+            ImageUrl = "/hero.jpg"
+        };
+        hotelFormError = "";
+        showAddHotelModal = true;
+    }
+
+    async Task SaveNewHotel()
+    {
+        if (string.IsNullOrWhiteSpace(newHotel.Name))
+        {
+            hotelFormError = "Lütfen otel adını giriniz.";
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(newHotel.City))
+        {
+            hotelFormError = "Lütfen şehir / bölge bilgisini giriniz.";
+            return;
+        }
+
+        try
+        {
+            await NearbySvc.AddHotelAsync(newHotel);
+            showAddHotelModal = false;
+            await LoadDataAsync();
+            await SelectHotel(newHotel.Id);
+        }
+        catch (Exception ex)
+        {
+            hotelFormError = $"Kayıt hatası: {ex.Message}";
+        }
+    }
+
+    void OpenAddPlaceModal()
+    {
+        newPlace = new NearbyPlace
+        {
+            HotelId = selectedHotelId ?? (hotels.Count > 0 ? hotels[0].Id : 1),
+            Category = "Activity",
+            PriceLevel = 3,
+            Rating = 4.9m,
+            ReviewCount = 100,
+            ImageUrl = "/images/boat_tour.jpg",
+            WorkingHours = "09:30 - 18:00",
+            Latitude = selectedHotel?.Latitude,
+            Longitude = selectedHotel?.Longitude
+        };
+        placeFormError = "";
+        showAddPlaceModal = true;
+    }
+
+    async Task SaveNewPlace()
+    {
+        if (string.IsNullOrWhiteSpace(newPlace.Name))
+        {
+            placeFormError = "Lütfen mekan veya aktivite adını giriniz.";
+            return;
+        }
+
+        if (newPlace.DistanceMeters <= 0)
+        {
+            placeFormError = "Lütfen geçerli bir mesafe giriniz.";
+            return;
+        }
+
+        try
+        {
+            await NearbySvc.AddAsync(newPlace);
+            showAddPlaceModal = false;
+            await LoadDataAsync();
+        }
+        catch (Exception ex)
+        {
+            placeFormError = $"Kayıt sırasında hata oluştu: {ex.Message}";
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        dotNetRef?.Dispose();
+    }
+}

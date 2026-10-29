@@ -1,0 +1,77 @@
+@page "/staff"
+@inject AppDb Db
+
+<div class="page-head">
+    <div>
+        <h1>@L["nav.staff"]</h1>
+        <p>@(L.Lang == "tr" ? "Personel Listesi, Departmanlar ve Günlük Vardiya Çizelgesi" : "Staff directory, departments, and shift schedules")</p>
+    </div>
+    <div style="display:flex;gap:10px">
+        <a class="btn primary" href="/jobs">💼 Personel İlanları & İş Başvuruları (Garson, Komi, Temizlik) →</a>
+    </div>
+</div>
+
+<div class="grid g2 mb">
+    <div class="card">
+        <h3>Personel Listesi</h3>
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Ad Soyad</th>
+                        <th>Departman</th>
+                        <th>İletişim</th>
+                        <th>Durum</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var emp in employees)
+                    {
+                        <tr>
+                            <td><b>@emp.FullName</b></td>
+                            <td>@emp.Department</td>
+                            <td>@(emp.Phone ?? "-")</td>
+                            <td><span class="badge @(emp.IsActive ? "b-ok" : "b-muted")">@(emp.IsActive ? "Aktif" : "Ayrıldı")</span></td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="card">
+        <h3>Haftalık Vardiyalar</h3>
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Personel</th>
+                        <th>Tarih</th>
+                        <th>Çalışma Saatleri</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var sh in shifts)
+                    {
+                        <tr>
+                            <td><b>@sh.Employee?.FullName</b></td>
+                            <td>@Fmt.D(sh.Date)</td>
+                            <td><small>@sh.StartTime.ToString(@"hh\:mm") - @sh.EndTime.ToString(@"hh\:mm")</small></td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+@code {
+    List<Employee> employees = new();
+    List<Shift> shifts = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        employees = await Db.Employees.OrderBy(e => e.FullName).ToListAsync();
+        shifts = await Db.Shifts.Include(s => s.Employee).OrderBy(s => s.Date).Take(30).ToListAsync();
+    }
+}

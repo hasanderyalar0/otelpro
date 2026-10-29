@@ -1,0 +1,932 @@
+@page "/digital-twin"
+@layout Otel.Web.Components.Layout.PublicLayout
+@inject AppDb Db
+@inject HotelState CurrentHotelState
+
+<div style="max-width: 1440px; margin: 24px auto; padding: 0 24px;">
+<div class="page-head">
+    <div>
+        <div style="display:flex;align-items:center;gap:10px">
+            <h1>👁️ 3D Dijital İkiz (Digital Twin) Otel Kat Planı</h1>
+            <span class="badge b-ok" style="font-size:0.85rem">🏢 @(CurrentHotelState.SelectedHotel?.Name ?? "Grand Aegean Resort")</span>
+            <span class="badge" style="background:#8b5cf6;color:#fff;font-size:0.85rem">Endüstri 4.0 Akıllı Bina</span>
+        </div>
+        <p>Otelin tüm katlarının, odalarının ve IoT sensörlerinin gerçek zamanlı izometrik dijital ikiz modeli.</p>
+    </div>
+    <div style="display:flex;gap:10px">
+        <button class="btn @(isNightMode ? "primary" : "")" @onclick="ToggleNightMode">
+            @(isNightMode ? "☀️ Gündüz Görünümü" : "🌙 Gece Neon Modu")
+        </button>
+        <button class="btn" @onclick="SimulateRandomTelemetry">
+            ⚡ Canlı IoT Telemetrisini Simüle Et
+        </button>
+    </div>
+</div>
+
+<!-- Canlı Bina KPI Kartları -->
+<div class="grid g4 mb">
+    <div class="card kpi">
+        <span class="ico">🏢</span>
+        <div class="label">Aktif Kat & Oda Sayısı</div>
+        <div class="val">4 Kat / @rooms.Count Oda</div>
+        <div class="sub">10 Oda / Kat Mimarisi</div>
+    </div>
+    <div class="card kpi">
+        <span class="ico">🔴</span>
+        <div class="label">Dolu & İçeride Misafir</div>
+        <div class="val">@occupiedCount Oda</div>
+        <div class="sub">%@occupancyPct Anlık Doluluk</div>
+    </div>
+    <div class="card kpi">
+        <span class="ico">🟢</span>
+        <div class="label">Müsait & Temiz Oda</div>
+        <div class="val">@availableCount Oda</div>
+        <div class="sub">Satışa Hazır Kontenjan</div>
+    </div>
+    <div class="card kpi">
+        <span class="ico">🌡️</span>
+        <div class="label">Bina Ort. Sıcaklık & Eko</div>
+        <div class="val">@avgTemp.ToString("0.0") °C</div>
+        <div class="sub">%@avgHumidity.ToString("0") Bağıl Nem · Eko-Aktif</div>
+    </div>
+</div>
+
+<!-- Kat Seçici ve Durum Lejantı -->
+<div class="card mb" style="padding:14px 20px">
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:14px">
+        <!-- Kat Butonları -->
+        <div class="floor-nav-pills">
+            <button class="floor-pill @(selectedFloor == 0 ? "active" : "")" @onclick="() => selectedFloor = 0">
+                🌐 Tüm Katları Gör (3D İzometrik Bina)
+            </button>
+            <button class="floor-pill @(selectedFloor == 1 ? "active" : "")" @onclick="() => selectedFloor = 1">
+                🏨 1. Kat (Bahçe & Havuz Katı: 101 - 110)
+            </button>
+            <button class="floor-pill @(selectedFloor == 2 ? "active" : "")" @onclick="() => selectedFloor = 2">
+                🌅 2. Kat (Deniz Manzaralı: 201 - 210)
+            </button>
+            <button class="floor-pill @(selectedFloor == 3 ? "active" : "")" @onclick="() => selectedFloor = 3">
+                ⭐ 3. Kat (Deluxe & Suit Katı: 301 - 310)
+            </button>
+            <button class="floor-pill @(selectedFloor == 4 ? "active" : "")" @onclick="() => selectedFloor = 4">
+                👑 4. Kat (Penthouse & VIP: 401 - 410)
+            </button>
+        </div>
+
+        <!-- Lejant -->
+        <div class="legend-row">
+            <span class="leg-item"><span class="dot green"></span> Boş & Temiz</span>
+            <span class="leg-item"><span class="dot red"></span> Dolu (Misafir İçeride)</span>
+            <span class="leg-item"><span class="dot yellow"></span> Temizlik Bekliyor</span>
+            <span class="leg-item"><span class="dot purple"></span> VIP Jakuzili Suit</span>
+            <span class="leg-item"><span class="dot blue"></span> Bakımda</span>
+        </div>
+    </div>
+</div>
+
+<!-- İZOMETRİK 3D DİJİTAL İKİZ BİNA GÖRSELLEŞTİRİCİSİ -->
+<div class="digital-twin-stage @(isNightMode ? "night-mode" : "")">
+    @if (selectedFloor == 0)
+    {
+        <!-- BÜTÜN BİNA 4 KAT ÜST ÜSTE İZOMETRİK PERSPEKTİF -->
+        <div class="building-3d-stack">
+            <!-- Çatı Katı / Rooftop Bar & Havuz Terası -->
+            <div class="rooftop-deck">
+                <div class="roof-sign">✨ ROOFTOP SKY LOUNGE & SONSUZLUK HAVUZU</div>
+                <div class="roof-elements">
+                    <span class="roof-ico">🏊‍♂️ Havuz: 28°C</span>
+                    <span class="roof-ico">🍸 Sky Bar: Açık</span>
+                    <span class="roof-ico">☀️ Güneşlenme Terası</span>
+                </div>
+            </div>
+
+            <!-- 4. Kat -->
+            @RenderFloorSlice(4, "👑 4. Kat — Penthouse & VIP Kral Daireleri", "floor-4")
+
+            <!-- 3. Kat -->
+            @RenderFloorSlice(3, "⭐ 3. Kat — Deluxe & Jakuzili Suitler", "floor-3")
+
+            <!-- 2. Kat -->
+            @RenderFloorSlice(2, "🌅 2. Kat — Panoramik Deniz Manzaralı Odalar", "floor-2")
+
+            <!-- 1. Kat -->
+            @RenderFloorSlice(1, "🌿 1. Kat — Bahçe & Havuz Bağlantılı Odalar", "floor-1")
+
+            <!-- Zemin / Lobi & Resepsiyon -->
+            <div class="ground-lobby-deck">
+                <div class="lobby-label">🛎️ LOBİ & RESEPSİYON & ANA RESTORAN (Giriş Katı)</div>
+            </div>
+        </div>
+    }
+    else
+    {
+        <!-- TEK KAT DERİNLEMESİNE 3D KAT PLANI (ODALAR, KORİDORLAR, ASANSÖR) -->
+        <div class="single-floor-focus">
+            <div class="floor-focus-header">
+                <h3>
+                    <span>🏢 @GetFloorTitle(selectedFloor)</span>
+                    <span class="badge b-ok">10 Akıllı Oda Aktif</span>
+                </h3>
+                <button class="btn sm" @onclick="() => selectedFloor = 0">← Tüm Bina Görünümüne Dön</button>
+            </div>
+
+            <div class="floor-blueprint-wrap">
+                <!-- Koridor Üst Sırası (Tek Sayılı Odalar) -->
+                <div class="rooms-wing-row top-wing">
+                    @foreach (var r in GetFloorRooms(selectedFloor).Where((_, idx) => idx % 2 == 0))
+                    {
+                        @RenderRoomIsometricCard(r)
+                    }
+                </div>
+
+                <!-- Merkezi Koridor ve Asansör Şeridi -->
+                <div class="central-hallway">
+                    <div class="hallway-exit left">🚪 Yangın Merdiveni</div>
+                    <div class="hallway-carpet">
+                        <span class="carpet-text">✦ @selectedFloor. KAT ANA KORİDOR ✦</span>
+                        <span class="carpet-sub">Akıllı Hareket Sensörleri Aktif (Zigbee Mesh)</span>
+                    </div>
+                    <div class="hallway-elevator">🛗 Asansör #1 & #2 (Kat: @selectedFloor)</div>
+                    <div class="hallway-exit right">🚪 Servis Asansörü</div>
+                </div>
+
+                <!-- Koridor Alt Sırası (Çift Sayılı Odalar) -->
+                <div class="rooms-wing-row bottom-wing">
+                    @foreach (var r in GetFloorRooms(selectedFloor).Where((_, idx) => idx % 2 == 1))
+                    {
+                        @RenderRoomIsometricCard(r)
+                    }
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+<!-- ODA SEÇİMİ VE CANLI TELEMETRİ DETAY MODALI -->
+@if (selectedRoom != null)
+{
+    var t = GetRoomTelemetry(selectedRoom);
+    <div class="modal-backdrop" @onclick="CloseRoomModal">
+        <div class="room-twin-modal" @onclick:stopPropagation>
+            <div class="twin-modal-head">
+                <div style="display:flex;align-items:center;gap:12px">
+                    <span class="room-big-badge @t.StatusClass">Oda @selectedRoom.Number</span>
+                    <div>
+                        <h3 style="margin:0">@selectedRoom.RoomType?.Name</h3>
+                        <small class="muted">@selectedRoom.Floor?.Name · @(CurrentHotelState.SelectedHotel?.Name ?? "Tesis")</small>
+                    </div>
+                </div>
+                <button class="close-x" @onclick="CloseRoomModal">✕</button>
+            </div>
+
+            <div class="twin-modal-body">
+                <!-- Canlı Sensör Telemetri Izgarası -->
+                <div class="telemetry-grid">
+                    <div class="telem-card">
+                        <span class="icon">🌡️</span>
+                        <div>
+                            <div class="t-label">Oda Sıcaklığı</div>
+                            <div class="t-val">@t.Temperature.ToString("0.0") °C</div>
+                            <div class="t-sub">Hedef: 22.0 °C</div>
+                        </div>
+                    </div>
+                    <div class="telem-card">
+                        <span class="icon">💧</span>
+                        <div>
+                            <div class="t-label">Bağıl Nem</div>
+                            <div class="t-val">%@t.Humidity</div>
+                            <div class="t-sub">Konfor Seviyesi: İdeal</div>
+                        </div>
+                    </div>
+                    <div class="telem-card">
+                        <span class="icon">🚪</span>
+                        <div>
+                            <div class="t-label">Balkon / Pencere</div>
+                            <div class="t-val @(t.IsBalconyOpen ? "bad-val" : "ok-val")">
+                                @(t.IsBalconyOpen ? "AÇIK (Eko Mod)" : "KAPALI")
+                            </div>
+                            <div class="t-sub">Manyetik Kontak</div>
+                        </div>
+                    </div>
+                    <div class="telem-card">
+                        <span class="icon">🔐</span>
+                        <div>
+                            <div class="t-label">Akıllı Kapı Kilidi</div>
+                            <div class="t-val @(t.IsDoorLocked ? "ok-val" : "bad-val")">
+                                @(t.IsDoorLocked ? "KİLİTLİ" : "AÇIK (Geçiş)")
+                            </div>
+                            <div class="t-sub">NFC / Bluetooth BLE</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Misafir ve Durum Bilgisi -->
+                <div class="guest-occupancy-box">
+                    <div class="info-row">
+                        <span>Konaklama Durumu:</span>
+                        <b class="badge @t.StatusBadgeClass">@t.StatusText</b>
+                    </div>
+                    @if (t.IsOccupied)
+                    {
+                        <div class="info-row">
+                            <span>Kayıtlı Misafir:</span>
+                            <b style="color:#38bdf8">👤 @t.GuestName (@t.GuestNationality)</b>
+                        </div>
+                        <div class="info-row">
+                            <span>Check-in / Check-out:</span>
+                            <span>@t.CheckInDate.ToString("dd.MM.yyyy") – @t.CheckOutDate.ToString("dd.MM.yyyy")</span>
+                        </div>
+                    }
+                    <div class="info-row">
+                        <span>Klima Durumu:</span>
+                        <span><b>❄️ @t.AcMode</b> (@(t.IsAcOn ? "Çalışıyor" : "Beklemede"))</span>
+                    </div>
+                    <div class="info-row">
+                        <span>Minibar / Tüketim:</span>
+                        <span>🥤 @t.MinibarItems Adet İçecek Alındı (+@Fmt.Money(t.MinibarCost))</span>
+                    </div>
+                </div>
+
+                <!-- 1-Tıkla İnteraktif IoT Müdahale Butonları -->
+                <div class="modal-iot-actions">
+                    <button class="btn-iot-action @(t.IsDoorLocked ? "btn-unlock" : "btn-lock")" @onclick="() => ToggleDoorLock(selectedRoom)">
+                        @(t.IsDoorLocked ? "🔓 Kapı Kilidini Aç (NFC Tetikle)" : "🔒 Kapıyı Kilitle")
+                    </button>
+                    <button class="btn-iot-action btn-eco" @onclick="() => ToggleAcEco(selectedRoom)">
+                        @(t.IsEcoMode ? "❄️ Klimayı Standart Moda Al" : "🌱 Klimayı Eko Tasarrufa Al")
+                    </button>
+                    <button class="btn-iot-action btn-balcony" @onclick="() => ToggleBalconySensor(selectedRoom)">
+                        @(t.IsBalconyOpen ? "🚪 Balkon Kapısını Kapatıldı Say" : "💨 Balkon Kapısını Açık Simüle Et")
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+</div>
+
+@code {
+    List<Room> rooms = new();
+    int selectedFloor = 0; // 0 = Tüm Bina, 1..4 = Katlar
+    bool isNightMode = true;
+    Room? selectedRoom;
+
+    // Her oda için dinamik IoT telemetri verileri
+    Dictionary<int, RoomTelemetry> telemetryStore = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadRooms();
+    }
+
+    async Task LoadRooms()
+    {
+        int hId = CurrentHotelState.SelectedHotelId > 0 ? CurrentHotelState.SelectedHotelId : 1;
+        rooms = await Db.Rooms
+            .Include(r => r.RoomType)
+            .Include(r => r.Floor)
+            .Where(r => r.HotelId == hId)
+            .OrderBy(r => r.Number)
+            .ToListAsync();
+
+        InitTelemetry();
+    }
+
+    void InitTelemetry()
+    {
+        var rnd = new Random(42);
+        string[] guestNames = { "Ahmet Yılmaz", "Selin Korkmaz", "James Wilson", "Hans Schneider", "Elif Demir", "Fatma Koç", "John Smith", "Ayşe Kaya", "Dmitry Ivanov", "Marie Dubois" };
+        string[] nats = { "TR", "UK", "DE", "FR", "RU", "US" };
+
+        foreach (var r in rooms)
+        {
+            if (!telemetryStore.ContainsKey(r.Id))
+            {
+                int rNum = int.TryParse(r.Number, out var n) ? n : 101;
+                bool isOcc = (rNum % 3 != 0); // ~%66 doluluk
+                bool isClean = (rNum % 4 != 0);
+                bool isVip = (r.RoomType?.Name ?? "").Contains("Suit") || (r.RoomType?.Name ?? "").Contains("Penthouse");
+
+                telemetryStore[r.Id] = new RoomTelemetry
+                {
+                    RoomId = r.Id,
+                    IsOccupied = isOcc,
+                    IsClean = isClean,
+                    IsVip = isVip,
+                    Temperature = 21.0 + rnd.NextDouble() * 3.5,
+                    Humidity = rnd.Next(40, 60),
+                    IsBalconyOpen = rnd.Next(0, 10) > 7,
+                    IsDoorLocked = true,
+                    IsAcOn = true,
+                    IsEcoMode = rnd.Next(0, 2) == 1,
+                    AcMode = "Otomatik 22°C",
+                    GuestName = isOcc ? guestNames[rnd.Next(guestNames.Length)] : "—",
+                    GuestNationality = isOcc ? nats[rnd.Next(nats.Length)] : "",
+                    CheckInDate = DateTime.Today.AddDays(-rnd.Next(0, 3)),
+                    CheckOutDate = DateTime.Today.AddDays(rnd.Next(1, 4)),
+                    MinibarItems = isOcc ? rnd.Next(1, 5) : 0,
+                    MinibarCost = isOcc ? rnd.Next(150, 600) : 0
+                };
+            }
+        }
+    }
+
+    RoomTelemetry GetRoomTelemetry(Room r)
+    {
+        if (telemetryStore.TryGetValue(r.Id, out var val)) return val;
+        return new RoomTelemetry { RoomId = r.Id };
+    }
+
+    int occupiedCount => telemetryStore.Values.Count(t => t.IsOccupied);
+    int availableCount => rooms.Count - occupiedCount;
+    int occupancyPct => rooms.Count == 0 ? 0 : (int)Math.Round((double)occupiedCount / rooms.Count * 100);
+    double avgTemp => telemetryStore.Count == 0 ? 22.0 : telemetryStore.Values.Average(t => t.Temperature);
+    double avgHumidity => telemetryStore.Count == 0 ? 50.0 : telemetryStore.Values.Average(t => t.Humidity);
+
+    List<Room> GetFloorRooms(int floorNum)
+    {
+        return rooms.Where(r => r.Number.StartsWith(floorNum.ToString())).Take(10).ToList();
+    }
+
+    string GetFloorTitle(int floorNum)
+    {
+        return floorNum switch
+        {
+            4 => "4. Kat (Penthouse & VIP Kral Daireleri: 401 - 410)",
+            3 => "3. Kat (Deluxe & Jakuzili Suitler: 301 - 310)",
+            2 => "2. Kat (Panoramik Deniz Manzaralı: 201 - 210)",
+            _ => "1. Kat (Bahçe & Havuz Bağlantılı: 101 - 110)"
+        };
+    }
+
+    void ToggleNightMode() => isNightMode = !isNightMode;
+
+    void OpenRoomModal(Room r) => selectedRoom = r;
+    void CloseRoomModal() => selectedRoom = null;
+
+    void ToggleDoorLock(Room r)
+    {
+        var t = GetRoomTelemetry(r);
+        t.IsDoorLocked = !t.IsDoorLocked;
+    }
+
+    void ToggleAcEco(Room r)
+    {
+        var t = GetRoomTelemetry(r);
+        t.IsEcoMode = !t.IsEcoMode;
+        t.AcMode = t.IsEcoMode ? "Eko Tasarruf 24°C" : "Standart 21°C";
+        t.Temperature += t.IsEcoMode ? 1.5 : -1.5;
+    }
+
+    void ToggleBalconySensor(Room r)
+    {
+        var t = GetRoomTelemetry(r);
+        t.IsBalconyOpen = !t.IsBalconyOpen;
+        if (t.IsBalconyOpen)
+        {
+            t.IsEcoMode = true;
+            t.AcMode = "Balkon Açık - Eko Kısıldı";
+        }
+    }
+
+    void SimulateRandomTelemetry()
+    {
+        var rnd = new Random();
+        foreach (var t in telemetryStore.Values)
+        {
+            t.Temperature += (rnd.NextDouble() - 0.5) * 0.8;
+            t.Humidity = Math.Clamp(t.Humidity + rnd.Next(-2, 3), 35, 65);
+        }
+    }
+
+    RenderFragment RenderFloorSlice(int floorNum, string title, string cssClass) => __builder =>
+    {
+        var floorRooms = GetFloorRooms(floorNum);
+        <div class="building-floor-slice @cssClass">
+            <div class="floor-slice-badge">
+                <b>@title</b>
+                <button class="btn-slice-focus" @onclick="() => selectedFloor = floorNum">🔍 Bu Kata Odaklan</button>
+            </div>
+            <div class="slice-rooms-grid">
+                @foreach (var r in floorRooms)
+                {
+                    var t = GetRoomTelemetry(r);
+                    <div class="slice-room-box @t.StatusClass" @onclick="() => OpenRoomModal(r)" title="@r.Number: @r.RoomType?.Name - @t.StatusText">
+                        <span class="slice-r-num">@r.Number</span>
+                        <span class="slice-r-icon">@t.TypeIcon</span>
+                        <span class="slice-r-temp">@t.Temperature.ToString("0.0")°</span>
+                    </div>
+                }
+            </div>
+        </div>
+    };
+
+    RenderFragment RenderRoomIsometricCard(Room r) => __builder =>
+    {
+        var t = GetRoomTelemetry(r);
+        <div class="iso-room-card @t.StatusClass" @onclick="() => OpenRoomModal(r)">
+            <div class="iso-card-head">
+                <span class="iso-room-number">@r.Number</span>
+                <span class="iso-status-dot @t.StatusDotClass"></span>
+            </div>
+            <div class="iso-card-body">
+                <div class="iso-room-type">@r.RoomType?.Name</div>
+                <div class="iso-room-desc">@t.StatusText</div>
+                <div class="iso-telemetry-row">
+                    <span>🌡️ @t.Temperature.ToString("0.0")°C</span>
+                    <span>💧 %@t.Humidity</span>
+                    <span>@(t.IsBalconyOpen ? "💨 Balkon" : "🚪 Kapalı")</span>
+                </div>
+            </div>
+            <div class="iso-card-foot">
+                <span>@(t.IsOccupied ? $"👤 {t.GuestName.Split(' ')[0]}" : "🟢 Boş")</span>
+                <span class="door-status">@(t.IsDoorLocked ? "🔒" : "🔓")</span>
+            </div>
+        </div>
+    };
+
+    public class RoomTelemetry
+    {
+        public int RoomId { get; set; }
+        public bool IsOccupied { get; set; }
+        public bool IsClean { get; set; }
+        public bool IsVip { get; set; }
+        public double Temperature { get; set; } = 22.0;
+        public int Humidity { get; set; } = 45;
+        public bool IsBalconyOpen { get; set; }
+        public bool IsDoorLocked { get; set; } = true;
+        public bool IsAcOn { get; set; } = true;
+        public bool IsEcoMode { get; set; }
+        public string AcMode { get; set; } = "Standart 22°C";
+        public string GuestName { get; set; } = "—";
+        public string GuestNationality { get; set; } = "TR";
+        public DateTime CheckInDate { get; set; }
+        public DateTime CheckOutDate { get; set; }
+        public int MinibarItems { get; set; }
+        public decimal MinibarCost { get; set; }
+
+        public string StatusClass =>
+            IsVip ? "st-vip" :
+            IsOccupied ? "st-occupied" :
+            !IsClean ? "st-dirty" : "st-clean";
+
+        public string StatusDotClass =>
+            IsVip ? "dot-purple" :
+            IsOccupied ? "dot-red" :
+            !IsClean ? "dot-yellow" : "dot-green";
+
+        public string StatusBadgeClass =>
+            IsVip ? "b-vip" :
+            IsOccupied ? "b-occupied" :
+            !IsClean ? "b-dirty" : "b-ok";
+
+        public string StatusText =>
+            IsVip ? "VIP Jakuzili Suit" :
+            IsOccupied ? "Dolu (Misafir İçeride)" :
+            !IsClean ? "Temizlik Bekliyor" : "Müsait & Temiz";
+
+        public string TypeIcon =>
+            IsVip ? "👑" :
+            IsOccupied ? "🔴" :
+            !IsClean ? "🧹" : "🟢";
+    }
+}
+
+<style>
+/* 3D Dijital İkiz Sahnesi */
+.digital-twin-stage {
+    background: radial-gradient(circle at 50% 20%, #1e293b, #090d16);
+    border: 1px solid rgba(56, 189, 248, 0.3);
+    border-radius: 24px;
+    padding: 30px;
+    min-height: 600px;
+    position: relative;
+    overflow: hidden;
+    transition: all 0.3s ease;
+}
+.digital-twin-stage.night-mode {
+    background: radial-gradient(circle at 50% 10%, #0f172a, #030712);
+    box-shadow: inset 0 0 80px rgba(14, 165, 233, 0.15);
+}
+
+/* Kat Butonları */
+.floor-nav-pills {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+.floor-pill {
+    background: hsla(217, 33%, 18%, 0.7);
+    border: 1px solid hsla(217, 33%, 28%, 0.8);
+    color: #cbd5e1;
+    padding: 8px 14px;
+    border-radius: 10px;
+    font-size: 0.86rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+.floor-pill:hover, .floor-pill.active {
+    background: #0ea5e9;
+    border-color: #0ea5e9;
+    color: #fff;
+}
+
+/* Lejant */
+.legend-row {
+    display: flex;
+    gap: 14px;
+    align-items: center;
+    flex-wrap: wrap;
+    font-size: 0.82rem;
+    color: #cbd5e1;
+}
+.leg-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+.dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    display: inline-block;
+}
+.dot.green { background: #10b981; box-shadow: 0 0 8px #10b981; }
+.dot.red { background: #ef4444; box-shadow: 0 0 8px #ef4444; }
+.dot.yellow { background: #f59e0b; box-shadow: 0 0 8px #f59e0b; }
+.dot.purple { background: #a855f7; box-shadow: 0 0 8px #a855f7; }
+.dot.blue { background: #3b82f6; box-shadow: 0 0 8px #3b82f6; }
+
+/* 3D Bina Kat Kat Yığılma (Building Stack) */
+.building-3d-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    max-width: 1000px;
+    margin: 0 auto;
+}
+.rooftop-deck {
+    background: linear-gradient(135deg, rgba(168, 85, 247, 0.2), rgba(56, 189, 248, 0.2));
+    border: 1px dashed rgba(168, 85, 247, 0.5);
+    border-radius: 16px;
+    padding: 12px 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    color: #e2e8f0;
+}
+.roof-sign {
+    font-weight: 800;
+    font-size: 0.95rem;
+    color: #c084fc;
+}
+.roof-elements {
+    display: flex;
+    gap: 16px;
+    font-size: 0.85rem;
+}
+
+.building-floor-slice {
+    background: hsla(222, 47%, 14%, 0.92);
+    border: 1px solid hsla(217, 33%, 26%, 0.8);
+    border-radius: 18px;
+    padding: 14px 18px;
+    box-shadow: 0 10px 24px -6px rgba(0, 0, 0, 0.6);
+    transition: all 0.25s ease;
+}
+.building-floor-slice:hover {
+    border-color: #38bdf8;
+    transform: translateY(-2px);
+}
+.floor-slice-badge {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+    font-size: 0.92rem;
+    color: #38bdf8;
+}
+.btn-slice-focus {
+    background: hsla(217, 91%, 60%, 0.15);
+    border: 1px solid #38bdf8;
+    color: #38bdf8;
+    padding: 4px 10px;
+    border-radius: 6px;
+    font-size: 0.78rem;
+    cursor: pointer;
+}
+.btn-slice-focus:hover {
+    background: #38bdf8;
+    color: #04121e;
+}
+.slice-rooms-grid {
+    display: grid;
+    grid-template-columns: repeat(10, 1fr);
+    gap: 8px;
+}
+@@media (max-width: 900px) {
+    .slice-rooms-grid {
+        grid-template-columns: repeat(5, 1fr);
+    }
+}
+.slice-room-box {
+    background: #0f172a;
+    border: 1px solid #334155;
+    border-radius: 10px;
+    padding: 8px 4px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+.slice-room-box:hover {
+    transform: scale(1.08);
+    z-index: 5;
+}
+.slice-r-num {
+    font-size: 0.85rem;
+    font-weight: 800;
+}
+.slice-r-icon {
+    font-size: 0.9rem;
+}
+.slice-r-temp {
+    font-size: 0.68rem;
+    color: #94a3b8;
+}
+
+/* Durum Renkleri (Neon Glow) */
+.st-clean {
+    border-color: #10b981 !important;
+    background: rgba(16, 185, 129, 0.12) !important;
+    color: #34d399;
+}
+.st-occupied {
+    border-color: #ef4444 !important;
+    background: rgba(239, 68, 68, 0.15) !important;
+    color: #f87171;
+}
+.st-dirty {
+    border-color: #f59e0b !important;
+    background: rgba(245, 158, 11, 0.12) !important;
+    color: #fbbf24;
+}
+.st-vip {
+    border-color: #a855f7 !important;
+    background: rgba(168, 85, 247, 0.18) !important;
+    color: #c084fc;
+}
+
+.ground-lobby-deck {
+    background: linear-gradient(135deg, rgba(14, 165, 233, 0.2), rgba(16, 185, 129, 0.15));
+    border: 1px solid rgba(56, 189, 248, 0.4);
+    border-radius: 16px;
+    padding: 16px;
+    text-align: center;
+    font-weight: 800;
+    color: #38bdf8;
+    letter-spacing: 0.5px;
+}
+
+/* Tek Kat Derin Odak Planı (Blueprint Layout) */
+.single-floor-focus {
+    max-width: 1100px;
+    margin: 0 auto;
+}
+.floor-focus-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+}
+.floor-blueprint-wrap {
+    background: hsla(222, 47%, 11%, 0.95);
+    border: 2px dashed rgba(56, 189, 248, 0.35);
+    border-radius: 20px;
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+.rooms-wing-row {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 14px;
+}
+@@media (max-width: 800px) {
+    .rooms-wing-row {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+.central-hallway {
+    background: hsla(217, 33%, 16%, 0.8);
+    border: 1px solid hsla(217, 33%, 28%, 0.8);
+    border-radius: 12px;
+    padding: 14px 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.85rem;
+    color: #94a3b8;
+}
+.hallway-carpet {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+.carpet-text {
+    color: #38bdf8;
+    font-weight: 800;
+    letter-spacing: 2px;
+    font-size: 0.9rem;
+}
+.carpet-sub {
+    font-size: 0.72rem;
+    color: #64748b;
+}
+
+/* İzometrik Oda Kartı */
+.iso-room-card {
+    background: #0f172a;
+    border: 1px solid #334155;
+    border-radius: 14px;
+    padding: 12px;
+    cursor: pointer;
+    transition: all 0.22s ease;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+.iso-room-card:hover {
+    transform: translateY(-4px) scale(1.02);
+    box-shadow: 0 12px 28px rgba(0, 0, 0, 0.6);
+}
+.iso-card-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+.iso-room-number {
+    font-size: 1.1rem;
+    font-weight: 800;
+    color: #fff;
+}
+.iso-status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+}
+.dot-green { background: #10b981; box-shadow: 0 0 6px #10b981; }
+.dot-red { background: #ef4444; box-shadow: 0 0 6px #ef4444; }
+.dot-yellow { background: #f59e0b; box-shadow: 0 0 6px #f59e0b; }
+.dot-purple { background: #a855f7; box-shadow: 0 0 6px #a855f7; }
+
+.iso-room-type {
+    font-size: 0.82rem;
+    color: #e2e8f0;
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.iso-room-desc {
+    font-size: 0.74rem;
+    color: #94a3b8;
+}
+.iso-telemetry-row {
+    display: flex;
+    gap: 8px;
+    font-size: 0.72rem;
+    color: #cbd5e1;
+    margin-top: 4px;
+    background: rgba(0, 0, 0, 0.3);
+    padding: 4px 6px;
+    border-radius: 6px;
+}
+.iso-card-foot {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    padding-top: 6px;
+    font-size: 0.75rem;
+    color: #94a3b8;
+}
+
+/* Telemetri Modalı */
+.modal-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.8);
+    backdrop-filter: blur(8px);
+    display: grid;
+    place-items: center;
+    z-index: 9999;
+    padding: 20px;
+}
+.room-twin-modal {
+    background: #0f172a;
+    border: 1px solid #334155;
+    border-radius: 20px;
+    max-width: 620px;
+    width: 100%;
+    overflow: hidden;
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.8);
+}
+.twin-modal-head {
+    padding: 16px 20px;
+    border-bottom: 1px solid #1e293b;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+.room-big-badge {
+    padding: 6px 12px;
+    border-radius: 10px;
+    font-size: 1.1rem;
+    font-weight: 800;
+}
+.close-x {
+    background: transparent;
+    border: none;
+    color: #94a3b8;
+    font-size: 1.3rem;
+    cursor: pointer;
+}
+.twin-modal-body {
+    padding: 20px;
+}
+.telemetry-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+    margin-bottom: 20px;
+}
+.telem-card {
+    background: #1e293b;
+    border-radius: 12px;
+    padding: 12px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+.telem-card .icon {
+    font-size: 1.8rem;
+}
+.t-label {
+    font-size: 0.74rem;
+    color: #94a3b8;
+}
+.t-val {
+    font-size: 1.1rem;
+    font-weight: 800;
+    color: #fff;
+}
+.t-val.ok-val { color: #34d399; }
+.t-val.bad-val { color: #f87171; }
+.t-sub {
+    font-size: 0.68rem;
+    color: #64748b;
+}
+
+.guest-occupancy-box {
+    background: rgba(15, 23, 42, 0.6);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 12px;
+    padding: 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 20px;
+    font-size: 0.88rem;
+}
+.info-row {
+    display: flex;
+    justify-content: space-between;
+    color: #cbd5e1;
+}
+
+.modal-iot-actions {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+.btn-iot-action {
+    flex: 1;
+    min-width: 160px;
+    padding: 10px 14px;
+    border-radius: 10px;
+    font-weight: 700;
+    font-size: 0.85rem;
+    cursor: pointer;
+    border: none;
+    transition: all 0.2s;
+}
+.btn-unlock { background: #10b981; color: #022c22; }
+.btn-lock { background: #ef4444; color: #fff; }
+.btn-eco { background: #3b82f6; color: #fff; }
+.btn-balcony { background: #64748b; color: #fff; }
+</style>

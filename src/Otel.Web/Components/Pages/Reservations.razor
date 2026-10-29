@@ -1,0 +1,108 @@
+@page "/reservations"
+@inject AppDb Db
+@inject BookingService Booking
+@inject AuthService Auth
+
+<div class="page-head">
+    <div>
+        <div style="display:flex;align-items:center;gap:10px">
+            <h1>@L["nav.reservations"]</h1>
+            <span class="badge b-ok" style="font-size:0.85rem">🏢 @(CurrentHotelState.SelectedHotel?.Name ?? "Tesis")</span>
+        </div>
+        <p>@list.Count @(L.Lang == "tr" ? "rezervasyon kaydı listeleniyor" : "records")</p>
+    </div>
+    <div class="row">
+        <input class="search" placeholder="@L["c.search"]" @bind="search" @bind:event="oninput" @bind:after="Load" />
+        <select style="width:170px" @bind="statusFilter" @bind:after="Load">
+            <option value="">@L["c.all"]</option>
+            @foreach (var s in Enum.GetValues<ResStatus>()) { <option value="@s">@L["st." + s]</option> }
+        </select>
+        <a class="btn primary" href="/reservations/new">＋ @L["nav.newres"]</a>
+    </div>
+</div>
+
+@inject MachineLearningEngine Ml
+@inject YieldRadarService YieldService
+
+<div class="card" style="padding:6px">
+    <div class="table-wrap"><table>
+        <thead><tr><th>@L["c.code"]</th><th>@L["c.guest"]</th><th>@L["c.room"]</th><th>✈️ Uçuş & Varış</th><th>@L["c.channel"]</th><th>@L["c.checkin"]</th><th>@L["c.checkout"]</th><th class="num">@L["c.total"]</th><th class="num">@L["c.balance"]</th><th>🧠 ML.NET Risk</th><th>@L["c.status"]</th></tr></thead>
+        <tbody>
+        @foreach (var r in list)
+        {
+            var pred = Ml.PredictCancellation(r);
+            var prob = (int)Math.Round(pred.Probability * 100);
+            var flight = YieldService.GetFlightForReservation(r, CurrentHotelState.SelectedHotel);
+
+            <tr style="cursor:pointer" @onclick="() => Open(r.Id)">
+                <td><b>@r.Code</b></td>
+                <td>@r.Guest!.FullName</td>
+                <td>@string.Join(", ", r.Rooms.Select(x => x.Room?.Number ?? "-"))</td>
+                <td>
+                    @if (flight != null && (r.Status == ResStatus.Confirmed || r.Status == ResStatus.CheckedIn))
+                    {
+                        <div class="res-flight-cell">
+                            <span class="res-flight-pill @(flight.FlightStatus == "İndi" ? "landed" : "approaching")" title="@flight.OriginCity'den @flight.FlightNumber seferi (@flight.FlightStatus)">
+                                <span>@flight.OriginFlag</span>
+                                <b>@flight.FlightNumber</b>
+                                <small>(@flight.FlightStatus)</small>
+                            </span>
+                            <span class="res-flight-transfer" title="@flight.DriverInfo">
+                                🚗 @flight.EstimatedHotelArrival
+                            </span>
+                        </div>
+                    }
+                    else
+                    {
+                        <span class="muted" style="font-size:0.75rem">-</span>
+                    }
+                </td>
+                <td>@(r.Channel?.Name ?? "Direkt")</td>
+                <td>@Fmt.D(r.CheckIn)</td><td>@Fmt.D(r.CheckOut)</td>
+                <td class="num">@Fmt.Money(r.TotalAmount)</td>
+                <td class="num">@Fmt.Money(r.TotalAmount - (r.Folio?.Payments.Sum(p => p.Amount) ?? 0))</td>
+                <td>
+                    @if (r.Status == ResStatus.Confirmed)
+                    {
+                        @if (prob >= 60)
+                        {
+                            <span class="badge b-err" title="Yüksek İptal Riski">⚠️ % @prob</span>
+                        }
+                        else if (prob >= 35)
+                        {
+                            <span class="badge b-Dirty" title="Orta Risk">% @prob</span>
+                        }
+                        else
+                        {
+                            <span class="badge b-ok" title="Düşük Risk">✓ % @prob</span>
+                        }
+                    }
+                    else
+                    {
+                        <span class="muted" style="font-size:0.75rem">-</span>
+                    }
+                </td>
+                <td><Badge Value="@r.Status.ToString()" /></td>
+            </tr>
+        }
+        @if (list.Count == 0) { <tr><td colspan="11" class="muted">@L["c.none"]</td></tr> }
+        </tbody>
+    </table></div>
+</div>
+
+<ReservationDetail Id="selectedId" @bind-Show="showDetail" OnChanged="Load" />
+
+@code {
+    List<Reservation> list = new(); string search = "", statusFilter = ""; int selectedId; bool showDetail;
+    protected override async Task OnInitializedAsync() => await Load();
+    async Task Load()
+    {
+        int hId = CurrentHotelState.SelectedHotelId;
+        var q = Db.Reservations.AsNoTracking().Include(r => r.Guest).Include(r => r.Channel).Include(r => r.Rooms).ThenInclude(x => x.Room).Include(r => r.Folio).ThenInclude(f => f!.Payments).AsQueryable();
+        q = q.Where(r => r.Rooms.Any(rm => rm.Room!.HotelId == hId));
+        if (!string.IsNullOrWhiteSpace(statusFilter)) { var st = Enum.Parse<ResStatus>(statusFilter); q = q.Where(r => r.Status == st); }
+        if (!string.IsNullOrWhiteSpace(search)) q = q.Where(r => r.Code.Contains(search) || r.Guest!.FirstName.Contains(search) || r.Guest.LastName.Contains(search));
+        list = await q.OrderByDescending(r => r.CheckIn).Take(150).ToListAsync();
+    }
+    void Open(int id) { selectedId = id; showDetail = true; }
+}

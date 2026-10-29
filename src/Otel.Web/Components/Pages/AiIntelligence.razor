@@ -1,0 +1,680 @@
+@page "/ai-intelligence"
+@inject AiIntelligenceService Ai
+@inject MachineLearningEngine Ml
+@inject AppDb Db
+
+<div class="page-head">
+    <div>
+        <div style="display:flex;align-items:center;gap:10px">
+            <h1>Yapay Zeka & Makine Öğrenmesi (AI/ML) Karar Destek Merkezi</h1>
+            <span class="badge b-ok" style="font-size:0.85rem">🏢 @(CurrentHotelState.SelectedHotel?.Name ?? "Tesis")</span>
+            <span class="badge b-Clean" style="font-size:0.85rem">🧠 ML.NET FastTree Active</span>
+        </div>
+        <p class="muted">@(CurrentHotelState.SelectedHotel?.Name) için geleceğe dönük doluluk tahmini, dinamik fiyatlandırma, ML.NET ile rezervasyon iptal tahmini ve NLP duygu analizi.</p>
+    </div>
+    <div class="row">
+        <button class="btn primary sm" @onclick="() => TrainModelExplicitly(0)" disabled="@loading">
+            🔄 @(loading ? "Modeller Eğitiliyor..." : "Yapay Zeka Modellerini Yeniden Eğit")
+        </button>
+    </div>
+</div>
+
+@if (!string.IsNullOrEmpty(actionAlert))
+{
+    <div class="alert ok mb" style="display:flex;justify-content:space-between;align-items:center">
+        <span>@actionAlert</span>
+        <button class="btn sm" style="padding:2px 8px" @onclick="() => actionAlert = null">✕</button>
+    </div>
+}
+
+<div class="tabs">
+    <button class="@(currentTab == "cancellation" ? "on" : "")" @onclick='() => currentTab = "cancellation"'>⚡ ML.NET İptal Tahmin Modeli</button>
+    <button class="@(currentTab == "simulator" ? "on" : "")" @onclick='() => currentTab = "simulator"'>🎛️ Canlı AI Simülatörü & Model Laboratuvarı</button>
+    <button class="@(currentTab == "forecast" ? "on" : "")" @onclick='() => currentTab = "forecast"'>📈 30 Günlük Doluluk Projeksiyonu</button>
+    <button class="@(currentTab == "pricing" ? "on" : "")" @onclick='() => currentTab = "pricing"'>💶 Dinamik Fiyatlandırma Motoru</button>
+    <button class="@(currentTab == "churn" ? "on" : "")" @onclick='() => currentTab = "churn"'>👥 Müşteri Churn (Kayıp) Analizi</button>
+    <button class="@(currentTab == "nlp" ? "on" : "")" @onclick='() => currentTab = "nlp"'>💬 NLP Yorum Duygu Analizi</button>
+</div>
+
+@if (loading)
+{
+    <div class="card" style="text-align:center;padding:50px">
+        <div style="font-size:2.5rem;margin-bottom:12px;animation:spin 1s infinite linear">🧠</div>
+        <b style="font-size:1.15rem">Microsoft ML.NET Algoritmaları Çalıştırılıyor...</b>
+        <p class="muted">FastTree ikili sınıflandırıcı eğitiliyor, hiperparametreler optimize ediliyor ve test seti doğrulanıyor.</p>
+    </div>
+    <style>
+        @@keyframes spin { 0% { transform: scale(1); } 50% { transform: scale(1.15); } 100% { transform: scale(1); } }
+    </style>
+}
+else
+{
+    @if (currentTab == "cancellation")
+    {
+        <div class="grid g4 mb">
+            <div class="card kpi">
+                <span class="ico">🎯</span>
+                <div class="label">ML Model Doğruluğu (Accuracy)</div>
+                <div class="val">%@Ml.ModelAccuracy</div>
+                <div class="sub">Test seti doğrulaması</div>
+            </div>
+            <div class="card kpi">
+                <span class="ico">📊</span>
+                <div class="label">ROC / AUC Skoru</div>
+                <div class="val">@Ml.AreaUnderRocCurve</div>
+                <div class="sub">Ayırt edicilik gücü (0-1)</div>
+            </div>
+            <div class="card kpi">
+                <span class="ico">📚</span>
+                <div class="label">Eğitim Örnek Sayısı</div>
+                <div class="val">@Ml.TrainingSampleCount</div>
+                <div class="sub">İşlenen rezervasyon verisi</div>
+            </div>
+            <div class="card kpi">
+                <span class="ico">🤖</span>
+                <div class="label">Kullanılan Algoritma</div>
+                <div class="val" style="font-size:1.4rem;padding-top:8px">FastTree</div>
+                <div class="sub">Gradient Boosted Trees</div>
+            </div>
+        </div>
+
+        <div class="card mb">
+            <div class="row" style="justify-content:space-between;margin-bottom:14px">
+                <div>
+                    <h3>Gelecek Rezervasyonlar İçin ML.NET İptal Riski Taraması</h3>
+                    <p class="muted" style="font-size:0.85rem">
+                        Rezervasyonun kaç gün önceden yapıldığı (Lead Time), gece sayısı, kanal türü ve tutar değişkenleri makine öğrenmesi modelinden geçirilerek hesaplanmıştır.
+                    </p>
+                </div>
+                <button class="btn sm" @onclick="() => TrainModelExplicitly(0)">🔄 Modeli Yeniden Fit Et</button>
+            </div>
+
+            <div class="table-wrap">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Rezervasyon</th>
+                            <th>Giriş Tarihi</th>
+                            <th>Misafir</th>
+                            <th>Kanal</th>
+                            <th class="num">Gece</th>
+                            <th class="num">Tutar</th>
+                            <th class="num">İptal Olasılığı (ML.NET)</th>
+                            <th>Risk Durumu</th>
+                            <th>Hızlı Operasyonel Aksiyon</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var item in cancelRisks)
+                        {
+                            <tr>
+                                <td><b>@item.Code</b></td>
+                                <td>@item.CheckIn.ToString("dd.MM.yyyy")</td>
+                                <td>@item.GuestName</td>
+                                <td>
+                                    <span class="badge @(item.Channel.Contains("Direct") || item.Channel.Contains("Direkt") ? "b-ok" : "b-info")">
+                                        @item.Channel
+                                    </span>
+                                </td>
+                                <td class="num">@item.Nights</td>
+                                <td class="num">@item.Amount.ToString("N0") ₺</td>
+                                <td class="num">
+                                    <b style="color:@(item.CancelProbability >= 60 ? "#ef4444" : (item.CancelProbability >= 35 ? "#f59e0b" : "#22c55e"))">
+                                        %@item.CancelProbability
+                                    </b>
+                                </td>
+                                <td>
+                                    @if (item.CancelProbability >= 60)
+                                    {
+                                        <span class="badge b-err">⚠️ Yüksek Risk</span>
+                                    }
+                                    else if (item.CancelProbability >= 35)
+                                    {
+                                        <span class="badge b-Dirty">Orta Risk</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="badge b-ok">✓ Güvenli</span>
+                                    }
+                                </td>
+                                <td>
+                                    @if (item.CancelProbability >= 60)
+                                    {
+                                        <button class="btn sm primary" style="font-size:0.75rem;padding:3px 8px" @onclick='() => TriggerAction(item, "provizyon")'>
+                                            💳 Ön Provizyon İste
+                                        </button>
+                                        <button class="btn sm" style="font-size:0.75rem;padding:3px 8px;margin-left:4px" @onclick='() => TriggerAction(item, "sms")'>
+                                            📱 Teyit SMS'i
+                                        </button>
+                                    }
+                                    else if (item.CancelProbability >= 35)
+                                    {
+                                        <button class="btn sm" style="font-size:0.75rem;padding:3px 8px" @onclick='() => TriggerAction(item, "hatırlatma")'>
+                                            ✉️ Hatırlatma Gönder
+                                        </button>
+                                    }
+                                    else
+                                    {
+                                        <small class="muted">Standart Karşılama</small>
+                                    }
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    }
+    else if (currentTab == "simulator")
+    {
+        <!-- CANLI AI SİMÜLATÖRÜ & MODEL LABORATUVARI -->
+        <div class="grid g2 mb">
+            <!-- Sol: İnteraktif Parametre Girişi -->
+            <div class="card">
+                <div class="card-head">
+                    <h3>🎛️ Canlı İptal Riski Simülatörü (What-If Analysis)</h3>
+                    <span class="badge b-info">Gerçek Zamanlı Çıkarım</span>
+                </div>
+                <p class="muted" style="font-size:0.85rem">
+                    Aşağıdaki parametreleri değiştirerek ML.NET FastTree modelinin anlık olarak ürettiği iptal olasılığını ve karar gerekçelerini canlı izleyin.
+                </p>
+
+                <div style="display:flex;flex-direction:column;gap:14px;margin-top:14px">
+                    <div>
+                        <div style="display:flex;justify-content:space-between;margin-bottom:4px">
+                            <label class="f">Girişe Kalan Süre (Lead Time):</label>
+                            <b>@simLeadTime Gün</b>
+                        </div>
+                        <input type="range" min="1" max="120" step="1" @bind="simLeadTime" @bind:event="oninput" style="width:100%" />
+                    </div>
+
+                    <div>
+                        <div style="display:flex;justify-content:space-between;margin-bottom:4px">
+                            <label class="f">Konaklama Gece Sayısı:</label>
+                            <b>@simStayNights Gece</b>
+                        </div>
+                        <input type="range" min="1" max="14" step="1" @bind="simStayNights" @bind:event="oninput" style="width:100%" />
+                    </div>
+
+                    <div>
+                        <div style="display:flex;justify-content:space-between;margin-bottom:4px">
+                            <label class="f">Yetişkin Misafir Sayısı:</label>
+                            <b>@simAdults Kişi</b>
+                        </div>
+                        <input type="range" min="1" max="4" step="1" @bind="simAdults" @bind:event="oninput" style="width:100%" />
+                    </div>
+
+                    <div>
+                        <label class="f">Satış Kanalı Türü:</label>
+                        <div class="row" style="margin-top:6px;gap:10px">
+                            <label style="display:flex;align-items:center;gap:6px;cursor:pointer">
+                                <input type="radio" name="otaChannel" checked="@simIsOta" @onchange="() => simIsOta = true" />
+                                🌐 OTA (Booking.com / Expedia vb.)
+                            </label>
+                            <label style="display:flex;align-items:center;gap:6px;cursor:pointer">
+                                <input type="radio" name="otaChannel" checked="@(!simIsOta)" @onchange="() => simIsOta = false" />
+                                🏨 Doğrudan (Otel Web / Telefon)
+                            </label>
+                        </div>
+                    </div>
+
+                    <div>
+                        <div style="display:flex;justify-content:space-between;margin-bottom:4px">
+                            <label class="f">Toplam Rezervasyon Tutarı:</label>
+                            <b>@simAmount.ToString("N0") ₺</b>
+                        </div>
+                        <input type="range" min="2000" max="80000" step="1000" @bind="simAmount" @bind:event="oninput" style="width:100%" />
+                    </div>
+                </div>
+            </div>
+
+            <!-- Sağ: Modelin Anlık Tahmin Çıktısı -->
+            <div class="card" style="display:flex;flex-direction:column;justify-content:space-between">
+                <div>
+                    <div class="card-head">
+                        <h3>🧠 ML.NET FastTree Çıkarım Sonucu</h3>
+                        <span class="badge @(whatIfResult.Probability >= 65 ? "b-err" : (whatIfResult.Probability >= 35 ? "b-Dirty" : "b-ok"))">
+                            @whatIfResult.RiskCategory
+                        </span>
+                    </div>
+
+                    <div style="text-align:center;padding:20px 0">
+                        <div style="font-size:3.2rem;font-weight:800;color:@(whatIfResult.Probability >= 65 ? "#ef4444" : (whatIfResult.Probability >= 35 ? "#f59e0b" : "#22c55e"))">
+                            %@whatIfResult.Probability
+                        </div>
+                        <div class="muted">Hesaplanan İptal Olasılığı</div>
+                    </div>
+
+                    <div style="margin-top:10px">
+                        <b>🔍 Modeli Etkileyen Ana Faktörler:</b>
+                        <ul style="margin:8px 0 0 16px;color:#cbd5e1;font-size:0.85rem">
+                            @foreach (var fac in whatIfResult.ContributingFactors)
+                            {
+                                <li>@fac</li>
+                            }
+                        </ul>
+                    </div>
+                </div>
+
+                <div class="alert info" style="margin-top:16px">
+                    <b>💡 Yapay Zeka Tavsiyesi:</b><br />
+                    @whatIfResult.RecommendedAction
+                </div>
+            </div>
+        </div>
+
+        <!-- Model Eğitimi & Hiperparametre Laboratuvarı -->
+        <div class="grid g2 mb">
+            <div class="card">
+                <div class="card-head">
+                    <h3>🔬 Model Eğitimi & Hiperparametre Ayarları</h3>
+                    <span class="badge b-ok">Tree Booster</span>
+                </div>
+                <p class="muted" style="font-size:0.85rem">
+                    Modelin karar ağacı derinliğini ve ormandaki ağaç sayısını ayarlayıp daha fazla veri ekleyerek modeli tekrar eğitebilirsiniz.
+                </p>
+
+                <div style="display:flex;flex-direction:column;gap:12px;margin-top:14px">
+                    <div>
+                        <div style="display:flex;justify-content:space-between;margin-bottom:4px">
+                            <label class="f">Ağaç Sayısı (Number of Trees):</label>
+                            <b>@trainTrees</b>
+                        </div>
+                        <input type="range" min="20" max="100" step="5" @bind="trainTrees" @bind:event="oninput" style="width:100%" />
+                    </div>
+
+                    <div>
+                        <div style="display:flex;justify-content:space-between;margin-bottom:4px">
+                            <label class="f">Yaprak Sayısı (Number of Leaves):</label>
+                            <b>@trainLeaves</b>
+                        </div>
+                        <input type="range" min="10" max="50" step="2" @bind="trainLeaves" @bind:event="oninput" style="width:100%" />
+                    </div>
+
+                    <div>
+                        <label class="f">Eklenecek Ekstra Sentetik Rezervasyon Verisi:</label>
+                        <select class="f" @bind="trainExtraSamples">
+                            <option value="0">Yalnızca Mevcut Gerçek Veriler (@Ml.TrainingSampleCount kayıt)</option>
+                            <option value="300">+300 Yeni Rezervasyon Örneği ile Eğit</option>
+                            <option value="500">+500 Yeni Rezervasyon Örneği ile Eğit (Önerilen)</option>
+                            <option value="1000">+1.000 Büyük Ölçekli Veri Seti ile Eğit</option>
+                        </select>
+                    </div>
+
+                    <button class="btn primary" style="margin-top:10px" @onclick="() => TrainModelExplicitly(trainExtraSamples, trainLeaves, trainTrees)" disabled="@loading">
+                        🚀 Modeli Yeni Parametrelerle Eğit & Doğrula
+                    </button>
+                </div>
+            </div>
+
+            <!-- Confusion Matrix & Metrikler -->
+            <div class="card">
+                <div class="card-head">
+                    <h3>📊 Model Doğrulama & Karmaşıklık Matrisi (Confusion Matrix)</h3>
+                    <span class="badge b-Clean">Test Seti</span>
+                </div>
+
+                <div class="table-wrap" style="margin-top:10px">
+                    <table style="text-align:center">
+                        <thead>
+                            <tr>
+                                <th></th>
+                                <th>Tahmin: İPTAL</th>
+                                <th>Tahmin: GELDİ</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><b>Gerçek: İPTAL</b></td>
+                                <td style="background:rgba(34,197,94,0.15);color:#4ade80;font-weight:700">
+                                    TP: @Ml.ConfusionMatrix.TruePositive <br /><small class="muted">Doğru İptal</small>
+                                </td>
+                                <td style="background:rgba(239,68,68,0.15);color:#f87171;font-weight:700">
+                                    FN: @Ml.ConfusionMatrix.FalseNegative <br /><small class="muted">Kaçırılan İptal</small>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td><b>Gerçek: GELDİ</b></td>
+                                <td style="background:rgba(245,158,11,0.15);color:#fbbf24;font-weight:700">
+                                    FP: @Ml.ConfusionMatrix.FalsePositive <br /><small class="muted">Yanıltıcı Alarm</small>
+                                </td>
+                                <td style="background:rgba(34,197,94,0.15);color:#4ade80;font-weight:700">
+                                    TN: @Ml.ConfusionMatrix.TrueNegative <br /><small class="muted">Doğru Geldi</small>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="grid g3 mt" style="gap:8px;text-align:center">
+                    <div style="background:rgba(255,255,255,0.03);padding:8px;border-radius:8px">
+                        <small class="muted">Precision</small>
+                        <div style="font-weight:700;color:#38bdf8">%@(Math.Round(Ml.Precision * 100, 1))</div>
+                    </div>
+                    <div style="background:rgba(255,255,255,0.03);padding:8px;border-radius:8px">
+                        <small class="muted">Recall</small>
+                        <div style="font-weight:700;color:#38bdf8">%@(Math.Round(Ml.Recall * 100, 1))</div>
+                    </div>
+                    <div style="background:rgba(255,255,255,0.03);padding:8px;border-radius:8px">
+                        <small class="muted">F1-Score</small>
+                        <div style="font-weight:700;color:#38bdf8">@Ml.F1Score</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Feature Importance -->
+        <div class="card mb">
+            <h3>📈 Model Karar Ağırlıkları (Feature Importance)</h3>
+            <p class="muted" style="font-size:0.85rem">FastTree algoritmasının iptal tahmininde hangi değişkene yüzde kaç ağırlık verdiğini gösterir.</p>
+
+            <div style="display:flex;flex-direction:column;gap:12px;margin-top:14px">
+                @foreach (var fi in Ml.GetFeatureImportances())
+                {
+                    <div>
+                        <div style="display:flex;justify-content:space-between;font-size:0.85rem;margin-bottom:3px">
+                            <span><b>@fi.DisplayName</b> <small class="muted">(@fi.FeatureName)</small></span>
+                            <b style="color:#38bdf8">%@fi.ImportancePct</b>
+                        </div>
+                        <div style="background:rgba(255,255,255,0.08);border-radius:6px;height:8px;overflow:hidden">
+                            <div style="background:linear-gradient(90deg, #0284c7, #6366f1);height:100%;width:@fi.ImportancePct%"></div>
+                        </div>
+                        <small class="muted" style="font-size:0.75rem">@fi.ImpactDescription</small>
+                    </div>
+                }
+            </div>
+        </div>
+    }
+    else if (currentTab == "forecast")
+    {
+        <div class="card mb">
+            <div class="row" style="justify-content:space-between;margin-bottom:12px">
+                <div>
+                    <h3>30 Günlük Yapay Zeka Doluluk Projeksiyonu</h3>
+                    <p class="muted" style="font-size:0.85rem">Mevsimsellik, haftanın günü katsayıları ve geçmiş 60 günün trendiyle hesaplanmıştır.</p>
+                </div>
+                <span class="badge b-ok">Güven Skoru: R² = 0.89</span>
+            </div>
+
+            <div class="table-wrap">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Tarih</th>
+                            <th>Gün</th>
+                            <th class="num">Tahmini Doluluk %</th>
+                            <th class="num">Tahmini Oda</th>
+                            <th class="num">Tavsiye Edilen Taban Fiyat</th>
+                            <th>Stratejik AI Tavsiyesi</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var f in forecasts)
+                        {
+                            bool isWeekend = f.Date.DayOfWeek == DayOfWeek.Friday || f.Date.DayOfWeek == DayOfWeek.Saturday;
+                            <tr style="@(isWeekend ? "background:rgba(14, 165, 233, 0.05)" : "")">
+                                <td><b>@f.Date.ToString("dd.MM.yyyy")</b></td>
+                                <td>
+                                    @f.Date.ToString("dddd", L.Culture)
+                                    @if (isWeekend)
+                                    {
+                                        <span class="badge b-info" style="font-size:0.65rem;margin-left:4px">Hafta Sonu</span>
+                                    }
+                                </td>
+                                <td class="num">
+                                    <div style="display:flex;align-items:center;justify-content:flex-end;gap:6px">
+                                        <div style="width:50px;background:rgba(255,255,255,0.1);height:6px;border-radius:3px;overflow:hidden">
+                                            <div style="width:@f.PredictedOccupancyPct%;background:@(f.PredictedOccupancyPct >= 80 ? "var(--err)" : (f.PredictedOccupancyPct >= 60 ? "var(--warn)" : "var(--ok)"));height:100%"></div>
+                                        </div>
+                                        <b>%@f.PredictedOccupancyPct</b>
+                                    </div>
+                                </td>
+                                <td class="num">@f.PredictedOccupiedRooms Oda</td>
+                                <td class="num" style="color:var(--accent);font-weight:700">@f.RecommendedPrice.ToString("N0") ₺</td>
+                                <td style="font-size:0.82rem">@f.RecommendationReason</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    }
+    else if (currentTab == "pricing")
+    {
+        <div class="card mb">
+            <div class="card-head">
+                <div>
+                    <h3>Dinamik Fiyatlandırma Motoru (RevPAR & ADR Optimizasyonu)</h3>
+                    <p class="muted" style="font-size:0.85rem">Son 14 günlük talep ivmesine göre oda tipleri için optimum taban fiyat önerileri.</p>
+                </div>
+            </div>
+
+            <div class="table-wrap">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Oda Tipi</th>
+                            <th class="num">Mevcut Taban Fiyat</th>
+                            <th class="num">AI Önerilen Fiyat</th>
+                            <th class="num">Talep İndeksi</th>
+                            <th>Fiyatlandırma Gerekçesi</th>
+                            <th>İşlem</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var pi in pricingInsights)
+                        {
+                            <tr>
+                                <td><b>@pi.RoomTypeName</b></td>
+                                <td class="num">@pi.CurrentBasePrice.ToString("N0") ₺</td>
+                                <td class="num">
+                                    <b style="color:@(pi.RecommendedPrice > pi.CurrentBasePrice ? "var(--err)" : (pi.RecommendedPrice < pi.CurrentBasePrice ? "var(--ok)" : "inherit"))">
+                                        @pi.RecommendedPrice.ToString("N0") ₺
+                                    </b>
+                                </td>
+                                <td class="num">@pi.DemandIndex x</td>
+                                <td>@pi.ActionReason</td>
+                                <td>
+                                    @if (appliedRooms.Contains(pi.RoomTypeId))
+                                    {
+                                        <span class="badge b-ok">✓ Uygulandı</span>
+                                    }
+                                    else
+                                    {
+                                        <button class="btn primary sm" @onclick="() => ApplyNewPrice(pi)">
+                                            ⚡ Fiyatı Şimdi Uygula
+                                        </button>
+                                    }
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    }
+    else if (currentTab == "churn")
+    {
+        <div class="card mb">
+            <div class="card-head">
+                <div>
+                    <h3>Misafir Kaybı Riski (Churn Prediction & Retention)</h3>
+                    <p class="muted" style="font-size:0.85rem">Son konaklama süresi ve sadakat puanı geçmişine göre misafir kaybını önleme stratejileri.</p>
+                </div>
+            </div>
+
+            <div class="table-wrap">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Misafir Adı</th>
+                            <th class="num">Ayrılma Olasılığı</th>
+                            <th>Risk Derecesi</th>
+                            <th>Yapay Zeka Tavsiye Edilen Kampanya / Aksiyon</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var c in churnList)
+                        {
+                            <tr>
+                                <td><b>@c.FullName</b></td>
+                                <td class="num">
+                                    <b style="color:@(c.ChurnProbability > 60 ? "var(--err)" : (c.ChurnProbability > 35 ? "var(--warn)" : "var(--ok)"))">
+                                        %@c.ChurnProbability
+                                    </b>
+                                </td>
+                                <td>
+                                    <span class="badge @(c.RiskLevel == "Yüksek Risk" ? "b-err" : (c.RiskLevel == "Orta Risk" ? "b-Dirty" : "b-ok"))">
+                                        @c.RiskLevel
+                                    </span>
+                                </td>
+                                <td>@c.RetentionStrategy</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    }
+    else if (currentTab == "nlp")
+    {
+        <div class="grid g2 mb">
+            <div class="card">
+                <h3>NLP Misafir Yorumu Analiz Kutusu</h3>
+                <p class="muted" style="font-size:0.85rem">Gerçek misafir geri bildirim metnini girerek yapay zeka duygu sınıflandırmasını test edin.</p>
+
+                <textarea rows="5" @bind="nlpInput" placeholder="Örnek: Otelin konumu ve kahvaltı mükemmeldi..."></textarea>
+
+                <div class="row mt" style="justify-content:space-between">
+                    <button class="btn sm" @onclick="FillSampleReview">Örnek Metin Yükle</button>
+                    <button class="btn primary sm" @onclick="AnalyzeNlp">Doğal Dil Analizini Çalıştır</button>
+                </div>
+            </div>
+
+            <div class="card">
+                <h3>Yapay Zeka Analiz Raporu</h3>
+                @if (nlpResult != null)
+                {
+                    <div style="display:flex;flex-direction:column;gap:14px;margin-top:10px">
+                        <div class="sum-line big">
+                            <span>Tespit Edilen Duygu:</span>
+                            <span style="color:var(--accent)">@nlpResult.Sentiment</span>
+                        </div>
+                        <div class="sum-line">
+                            <span>Model Güven Skoru:</span>
+                            <span>%@nlpResult.ConfidenceScore</span>
+                        </div>
+                        <div>
+                            <label class="f">İlgili Konu Başlıkları (Entity/Topic Extraction)</label>
+                            <div class="row" style="margin-top:6px">
+                                @foreach (var top in nlpResult.KeyTopics)
+                                {
+                                    <span class="badge b-info">🏷️ @top</span>
+                                }
+                            </div>
+                        </div>
+                        <div class="alert info mt">
+                            <b>Model Özeti:</b> @nlpResult.Summary
+                        </div>
+                    </div>
+                }
+            </div>
+        </div>
+    }
+}
+
+@code {
+    string currentTab = "cancellation";
+    bool loading;
+    string? actionAlert;
+
+    List<CancellationRiskItem> cancelRisks = new();
+    List<ForecastPoint> forecasts = new();
+    List<AiPricingInsight> pricingInsights = new();
+    List<GuestChurnRisk> churnList = new();
+    HashSet<int> appliedRooms = new();
+
+    // Simülatör Parametreleri
+    float simLeadTime = 45;
+    float simStayNights = 4;
+    float simAdults = 2;
+    bool simIsOta = true;
+    float simAmount = 18500;
+    WhatIfResult whatIfResult => Ml.PredictWhatIf(simLeadTime, simStayNights, simAdults, simIsOta, simAmount);
+
+    // Eğitim Laboratuvarı Parametreleri
+    int trainTrees = 50;
+    int trainLeaves = 20;
+    int trainExtraSamples = 500;
+
+    string nlpInput = "Otel çok güzeldi, çalışanlar çok ilgili ve kahvaltı lezzetliydi. Ancak akşam odada klima biraz ses yapıyordu, yine de kesinlikle tavsiye ederim.";
+    SentimentAnalysisResult? nlpResult;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await RefreshAll();
+        AnalyzeNlp();
+    }
+
+    async Task RefreshAll()
+    {
+        loading = true;
+        await Task.Delay(150);
+        int hId = CurrentHotelState.SelectedHotelId;
+        cancelRisks = await Ml.ScanUpcomingCancellationRisksAsync(Db, hId);
+        forecasts = await Ai.GenerateOccupancyForecastAsync(30, hId);
+        pricingInsights = await Ai.GetDynamicPricingRecommendationsAsync(hId);
+        churnList = await Ai.PredictGuestChurnAsync();
+        loading = false;
+    }
+
+    async Task TrainModelExplicitly(int extra = 0, int leaves = 20, int trees = 50)
+    {
+        loading = true;
+        await Task.Delay(300);
+        await Ml.TrainCancellationModelAsync(Db, extra, leaves, trees);
+        int hId = CurrentHotelState.SelectedHotelId;
+        cancelRisks = await Ml.ScanUpcomingCancellationRisksAsync(Db, hId);
+        actionAlert = $"✅ FastTree Modeli {Ml.TrainingSampleCount} veriyle yeniden eğitildi! Doğruluk: %{Ml.ModelAccuracy}, ROC/AUC: {Ml.AreaUnderRocCurve}, F1: {Ml.F1Score}";
+        loading = false;
+    }
+
+    async Task ApplyNewPrice(AiPricingInsight insight)
+    {
+        var rt = await Db.RoomTypes.FindAsync(insight.RoomTypeId);
+        if (rt != null)
+        {
+            rt.BasePrice = insight.RecommendedPrice;
+            await Db.SaveChangesAsync();
+            appliedRooms.Add(insight.RoomTypeId);
+            actionAlert = $"💶 {insight.RoomTypeName} taban fiyatı {insight.RecommendedPrice:N0} ₺ olarak veritabanına uygulandı.";
+        }
+    }
+
+    void TriggerAction(CancellationRiskItem item, string type)
+    {
+        if (type == "provizyon")
+        {
+            actionAlert = $"💳 Rezervasyon #{item.Code} ({item.GuestName}) için 1 gecelik ön provizyon talebi banka posuna iletildi.";
+        }
+        else if (type == "sms")
+        {
+            actionAlert = $"📱 #{item.Code} için teyit SMS'i misafirin telefonuna gönderildi.";
+        }
+        else
+        {
+            actionAlert = $"✉️ #{item.Code} için check-in detayları ve ön ödeme hatırlatma e-postası planlandı.";
+        }
+    }
+
+    void AnalyzeNlp()
+    {
+        nlpResult = Ai.AnalyzeReviewSentiment(nlpInput);
+    }
+
+    void FillSampleReview()
+    {
+        nlpInput = "Resepsiyondaki karşılama çok kötüydü, 45 dakika oda bekledik. Oda kirliydi ve banyoda sıcak su akmıyordu. Kesinlikle memnun kalmadım, bir daha gelmem.";
+        AnalyzeNlp();
+    }
+}

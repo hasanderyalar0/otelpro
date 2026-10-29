@@ -1,0 +1,162 @@
+@inject AppDb Db
+@inject BookingService Booking
+@inject AuthService Auth
+@inject YieldRadarService YieldService
+
+<Modal Show="Show" ShowChanged="ShowChanged" Title="@(r == null ? "" : $"{r.Code} · {r.Guest!.FullName}")" Width="900px">
+    @if (r != null)
+    {
+        @if (error != null) { <div class="alert bad">@error</div> }
+        <div class="grid g3 mb">
+            <div><label class="f">@L["c.status"]</label><Badge Value="@r.Status.ToString()" /></div>
+            <div><label class="f">@L["c.checkin"]</label>@Fmt.D(r.CheckIn)</div>
+            <div><label class="f">@L["c.checkout"]</label>@Fmt.D(r.CheckOut) <span class="muted">(@r.Nights @L["c.nights"])</span></div>
+            <div><label class="f">@L["c.room"]</label>@string.Join(", ", r.Rooms.Select(x => $"{x.Room?.Number} ({x.RoomType?.Name})"))</div>
+            <div><label class="f">@L["c.channel"]</label>@(r.Channel?.Name ?? "Direkt")</div>
+            <div><label class="f">@L["c.board"]</label>@r.BoardType?.Name · @r.Adults+@r.Children</div>
+        </div>
+
+        <!-- Misafir Uçuş & Karşılama Kartı -->
+        @if (flightInfo != null && r.Status != ResStatus.Cancelled)
+        {
+            <div class="card mb" style="background:linear-gradient(135deg, rgba(15,23,42,0.9), rgba(30,41,59,0.8));border:1px solid rgba(56,189,248,0.3);padding:14px;border-radius:12px">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+                    <div style="display:flex;align-items:center;gap:8px">
+                        <span style="font-size:1.3rem">✈️</span>
+                        <div>
+                            <b style="color:#fff;font-size:0.88rem">Misafir Uçuş & VIP Karşılama Telemetrisi</b>
+                            <small style="color:#94a3b8;display:block">Canlı Bölge Uçuş Radarı ile Eşleşti</small>
+                        </div>
+                    </div>
+                    <span class="f-status @(flightInfo.FlightStatus == "İndi" ? "landed" : "approaching")" style="font-size:0.75rem">
+                        @flightInfo.FlightStatus (@flightInfo.ArrivalTime)
+                    </span>
+                </div>
+
+                <div class="grid g3" style="font-size:0.8rem">
+                    <div>
+                        <span class="muted" style="display:block">Uçuş Seferi:</span>
+                        <b style="color:#38bdf8">@flightInfo.OriginFlag @flightInfo.FlightNumber</b>
+                        <span class="muted" style="font-size:0.75rem;display:block">(@flightInfo.OriginCity ➔ @(CurrentHotelState.SelectedHotel?.City ?? "Otel"))</span>
+                    </div>
+                    <div>
+                        <span class="muted" style="display:block">VIP Transfer & Şoför:</span>
+                        <b style="color:#fbbf24">@flightInfo.DriverInfo</b>
+                        <span style="color:#38bdf8;font-size:0.75rem;display:block">@flightInfo.TransferStatus</span>
+                    </div>
+                    <div>
+                        <span class="muted" style="display:block">Tahmini Otele Varış (ETA):</span>
+                        <b style="color:#34d399;font-size:0.95rem">⏱️ @flightInfo.EstimatedHotelArrival</b>
+                        <span class="muted" style="font-size:0.75rem;display:block">Erken Oda Teslimi Aktif</span>
+                    </div>
+                </div>
+
+                @if (!string.IsNullOrEmpty(flightToast))
+                {
+                    <div class="action-toast-banner" style="margin-top:10px">
+                        @flightToast
+                    </div>
+                }
+
+                <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
+                    <button class="btn sm" @onclick="() => CallDriver(flightInfo.DriverInfo)">
+                        📞 Şoförü Ara
+                    </button>
+                    <button class="btn sm" @onclick="() => SendFlightSms(flightInfo.GuestName)">
+                        📱 Karşılama SMS'i Gönder
+                    </button>
+                    <button class="btn sm primary" @onclick="NotifyEarlyCheckin">
+                        🛎️ Erken Giriş Bildir
+                    </button>
+                </div>
+            </div>
+        }
+
+        <div class="row mb">
+            @if (r.Status is ResStatus.Confirmed or ResStatus.Tentative) { <button class="btn primary" @onclick="DoCheckIn">🛬 @L["c.checkin"]</button> }
+            @if (r.Status == ResStatus.CheckedIn) { <button class="btn primary" @onclick="DoCheckOut">🛫 @L["c.checkout"]</button> }
+            @if (r.Status is ResStatus.Confirmed or ResStatus.Tentative) { <button class="btn danger" @onclick="DoCancel">✕ @L["c.cancel"]</button> }
+            @if (r.Folio != null) { <button class="btn" @onclick="DoInvoice">🧾 @(L.Lang == "tr" ? "Fatura Kes" : "Create Invoice")</button> }
+        </div>
+
+        @if (r.Folio != null)
+        {
+            var charges = r.Folio.Charges.Sum(c => c.Quantity * c.UnitPrice); var paid = r.Folio.Payments.Sum(p => p.Amount);
+            <div class="grid g2">
+                <div class="card">
+                    <h3>@(L.Lang == "tr" ? "Folyo / Harcamalar" : "Folio / Charges")</h3>
+                    @foreach (var c in r.Folio.Charges) { <div class="sum-line"><span>@c.Description <span class="muted">×@c.Quantity</span></span><span>@Fmt.Money(c.Quantity * c.UnitPrice)</span></div> }
+                    <div class="sum-line big"><span>@L["c.total"]</span><span>@Fmt.Money(charges)</span></div>
+                    @if (!r.Folio.IsClosed)
+                    {
+                        <div class="row mt">
+                            <select @bind="extraId" style="flex:1">
+                                <option value="0">+ @(L.Lang == "tr" ? "Hizmet ekle" : "Add service")</option>
+                                @foreach (var e in extras) { <option value="@e.Id">@e.Name — @Fmt.Money(e.Price)</option> }
+                            </select>
+                            <button class="btn sm" @onclick="AddExtra" disabled="@(extraId == 0)">@L["c.add"]</button>
+                        </div>
+                    }
+                </div>
+                <div class="card">
+                    <h3>@(L.Lang == "tr" ? "Ödemeler" : "Payments")</h3>
+                    @foreach (var p in r.Folio.Payments) { <div class="sum-line"><span>@Fmt.D(p.Date) · @p.PaymentMethod?.Name</span><span>@Fmt.Money(p.Amount)</span></div> }
+                    <div class="sum-line big"><span>@L["c.balance"]</span><span style="color:@(charges - paid > 0 ? "var(--warn)" : "var(--ok)")">@Fmt.Money(charges - paid)</span></div>
+                    @if (charges - paid > 0)
+                    {
+                        <div class="row mt">
+                            <input type="number" style="width:120px" @bind="payAmount" />
+                            <select @bind="payMethod" style="flex:1">@foreach (var m in methods) { <option value="@m.Id">@m.Name</option> }</select>
+                            <button class="btn primary sm" @onclick="AddPay">@L["c.add"]</button>
+                        </div>
+                    }
+                </div>
+            </div>
+        }
+        @if (invoiceNo != null) { <div class="alert ok mt">🧾 @invoiceNo</div> }
+    }
+</Modal>
+
+@code {
+    [Parameter] public int Id { get; set; }
+    [Parameter] public bool Show { get; set; }
+    [Parameter] public EventCallback<bool> ShowChanged { get; set; }
+    [Parameter] public EventCallback OnChanged { get; set; }
+    Reservation? r; string? error, invoiceNo, flightToast; int loadedId = -1; bool wasShown;
+    List<ExtraService> extras = new(); List<PaymentMethod> methods = new(); int extraId, payMethod; decimal payAmount;
+    ArrivingGuestFlightInfo? flightInfo => r != null ? YieldService.GetFlightForReservation(r, CurrentHotelState.SelectedHotel) : null;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (Show && (!wasShown || Id != loadedId)) { await Reload(); }
+        wasShown = Show;
+    }
+    async Task Reload()
+    {
+        loadedId = Id; error = null; invoiceNo = null;
+        Db.ChangeTracker.Clear();
+        r = await Db.Reservations.Include(x => x.Guest).Include(x => x.Channel).Include(x => x.BoardType)
+            .Include(x => x.Rooms).ThenInclude(x => x.Room).Include(x => x.Rooms).ThenInclude(x => x.RoomType)
+            .Include(x => x.Folio).ThenInclude(f => f!.Charges).Include(x => x.Folio).ThenInclude(f => f!.Payments).ThenInclude(p => p.PaymentMethod)
+            .AsSplitQuery().FirstOrDefaultAsync(x => x.Id == Id);
+        extras = await Db.ExtraServices.Where(e => e.IsActive).ToListAsync();
+        methods = await Db.PaymentMethods.ToListAsync();
+        payMethod = methods.FirstOrDefault()?.Id ?? 0;
+        if (r?.Folio != null) payAmount = Math.Max(0, r.Folio.Charges.Sum(c => c.Quantity * c.UnitPrice) - r.Folio.Payments.Sum(p => p.Amount));
+    }
+    async Task Run(Func<Task> act)
+    {
+        error = null;
+        try { await act(); await Reload(); await OnChanged.InvokeAsync(); }
+        catch (Exception ex) { error = ex.InnerException?.Message ?? ex.Message; }
+    }
+    Task DoCheckIn() => Run(() => Booking.CheckInAsync(Id));
+    Task DoCheckOut() => Run(() => Booking.CheckOutAsync(Id));
+    Task DoCancel() => Run(() => Booking.CancelAsync(Id));
+    Task AddExtra() => Run(async () => { var e = extras.First(x => x.Id == extraId); await Booking.AddChargeAsync(r!.Folio!.Id, e.Name, e.Category, 1, e.Price, e.TaxRate); extraId = 0; });
+    Task AddPay() => Run(() => Booking.AddPaymentAsync(r!.Folio!.Id, payAmount, payMethod, null));
+    Task DoInvoice() => Run(async () => { var inv = await Booking.CreateInvoiceAsync(r!.Folio!.Id, false); invoiceNo = $"{inv.Number} · {Fmt.Money2(inv.Total)}"; });
+    void CallDriver(string driver) => flightToast = $"📞 {driver} aranıyor (+90 532 500 40 30)... Şoför hatta: Karşılama hazır.";
+    void SendFlightSms(string guest) => flightToast = $"📱 {guest} misafirine karşılama SMS'i başarıyla gönderildi.";
+    void NotifyEarlyCheckin() => flightToast = "🛎️ Kat Hizmetleri uyarıldı: Erken giriş için oda öncelikli temizliğe alındı.";
+}

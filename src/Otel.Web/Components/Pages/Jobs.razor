@@ -1,0 +1,1331 @@
+@page "/jobs"
+@page "/kariyer"
+@layout Otel.Web.Components.Layout.PublicLayout
+@inject IDbContextFactory<AppDb> DbFactory
+@inject AuthService Auth
+
+<div class="jobs-page">
+    <!-- Hero Bölümü -->
+    <section class="jobs-hero">
+        <div class="jobs-hero-badge">
+            <span class="pulse-dot"></span> Turizm & Otelcilik Personel ve Kariyer Portalı
+        </div>
+        <h1>Oteller ve İş Arayanlar Tek Çatıda:<br/><span class="gradient-text">Garson, Komi ve Kat Hizmetleri İlanları</span></h1>
+        <p class="hero-desc">
+            Turizm sektöründeki oteller personel arıyor, çalışanlar en iyi lojmanlı ve maaşlı iş fırsatlarına doğrudan ulaşıyor. Aracısız, hızlı ve güvenilir başvuru.
+        </p>
+
+        <!-- Üst Hızlı İstatistikler & Butonlar -->
+        <div class="hero-stats-row">
+            <div class="stat-box">
+                <span class="num">@postings.Count</span>
+                <span class="lbl">Aktif Otel İlanı</span>
+            </div>
+            <div class="stat-box">
+                <span class="num">@candidates.Count</span>
+                <span class="lbl">Kayıtlı Aday Havuzu</span>
+            </div>
+            <div class="stat-box">
+                <span class="num">@applications.Count</span>
+                <span class="lbl">İncelenen Başvuru</span>
+            </div>
+            <div class="hero-actions">
+                <button class="btn-post-job" @onclick="() => showNewJobModal = true">
+                    ＋ Oteliniz İçin İlan Verin
+                </button>
+                <button class="btn-cv-pool" @onclick='() => activeTab = "cv"'>
+                    📝 İş Arıyorum (CV Bırak)
+                </button>
+            </div>
+        </div>
+    </section>
+
+    <!-- Sekmeler: İlanlar / Gelen Başvurular / CV Havuzu -->
+    <div class="portal-nav-tabs">
+        <button class="tab-btn @(activeTab == "jobs" ? "active" : "")" @onclick='() => activeTab = "jobs"'>
+            💼 Açık Otel İlanları (@filteredPostings.Count)
+        </button>
+        <button class="tab-btn @(activeTab == "applications" ? "active" : "")" @onclick='() => activeTab = "applications"'>
+            📥 Gelen Başvurular (@applications.Count)
+        </button>
+        <button class="tab-btn @(activeTab == "cv" ? "active" : "")" @onclick='() => activeTab = "cv"'>
+            👥 İş Arayanlar Havuzu (@candidates.Count)
+        </button>
+    </div>
+
+    @if (activeTab == "jobs")
+    {
+        <!-- Arama ve Filtreleme Çubuğu -->
+        <div class="filters-panel">
+            <!-- Pozisyon Butonları -->
+            <div class="role-pills">
+                <button class="pill @(selectedCategory == null ? "active" : "")" @onclick="() => selectedCategory = null">
+                    Tümü (@postings.Count)
+                </button>
+                <button class="pill @(selectedCategory == JobRoleCategory.Waiter ? "active" : "")" @onclick="() => selectedCategory = JobRoleCategory.Waiter">
+                    🍽️ Garsonlar
+                </button>
+                <button class="pill @(selectedCategory == JobRoleCategory.Busboy ? "active" : "")" @onclick="() => selectedCategory = JobRoleCategory.Busboy">
+                    盆 Komiler
+                </button>
+                <button class="pill @(selectedCategory == JobRoleCategory.Housekeeping ? "active" : "")" @onclick="() => selectedCategory = JobRoleCategory.Housekeeping">
+                    🧹 Temizlik & Kat Hizmetleri
+                </button>
+                <button class="pill @(selectedCategory == JobRoleCategory.FrontDesk ? "active" : "")" @onclick="() => selectedCategory = JobRoleCategory.FrontDesk">
+                    🛎️ Resepsiyon & Ön Büro
+                </button>
+            </div>
+
+            <!-- Şehir & Arama -->
+            <div class="search-row">
+                <div class="search-input-wrap">
+                    <span class="icon">🔍</span>
+                    <input type="text" placeholder="İlan başlığı, otel veya pozisyon ara..." @bind="searchQuery" @bind:event="oninput" />
+                </div>
+
+                <div class="select-wrap">
+                    <select @bind="selectedCity">
+                        <option value="">Tüm Şehirler</option>
+                        <option value="Bodrum">Bodrum / Muğla</option>
+                        <option value="Antalya">Antalya</option>
+                        <option value="İstanbul">İstanbul</option>
+                        <option value="Kapadokya">Kapadokya / Nevşehir</option>
+                        <option value="Çeşme">Çeşme / İzmir</option>
+                    </select>
+                </div>
+
+                <label class="checkbox-label">
+                    <input type="checkbox" @bind="onlyWithAccommodation" />
+                    <span>🏠 Sadece Lojman Sağlananlar</span>
+                </label>
+            </div>
+        </div>
+
+        <!-- İlan Listesi Grid -->
+        <div class="job-cards-grid">
+            @if (filteredPostings.Count == 0)
+            {
+                <div class="no-results-card">
+                    <span class="icon">🔍</span>
+                    <h3>Aradığınız kriterlere uygun ilan bulunamadı</h3>
+                    <p>Filtreleri temizleyerek veya farklı bir şehir seçerek tekrar deneyebilirsiniz.</p>
+                    <button class="btn-clear" @onclick="ClearFilters">Filtreleri Sıfırla</button>
+                </div>
+            }
+            @foreach (var job in filteredPostings)
+            {
+                <div class="job-card">
+                    <div class="job-card-top">
+                        <div class="role-category-tag">
+                            @GetRoleEmoji(job.Category) @job.PositionName
+                        </div>
+                        <span class="work-type-badge">@job.WorkType</span>
+                    </div>
+
+                    <h3 class="job-title">@job.Title</h3>
+
+                    <div class="hotel-meta">
+                        <span class="hotel-name">🏨 @(job.Hotel?.Name ?? "Lüks Resort Otel")</span>
+                        <span class="location">📍 @job.City</span>
+                    </div>
+
+                    <div class="perks-row">
+                        <div class="salary-tag">
+                            💰 <b>@job.SalaryRange</b>
+                        </div>
+                        @if (job.AccommodationProvided)
+                        {
+                            <span class="perk-badge lodg">🏠 Lojman Var</span>
+                        }
+                        @if (job.MealsIncluded)
+                        {
+                            <span class="perk-badge meal">🍽️ 3 Öğün Yemek</span>
+                        }
+                    </div>
+
+                    <p class="job-desc">@job.Description</p>
+
+                    <div class="requirements-box">
+                        <small><b>Aranan Nitelik:</b> @job.Requirements</small>
+                    </div>
+
+                    <div class="job-footer">
+                        <div class="contact-info">
+                            <small class="muted">İletişim:</small>
+                            <a href="tel:@job.ContactPhone" class="phone-link">📞 @job.ContactPhone</a>
+                        </div>
+                        <button class="btn-apply" @onclick="() => OpenApplyModal(job)">
+                            ⚡ Hızlı Başvuru Yap
+                        </button>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+    else if (activeTab == "applications")
+    {
+        <!-- Gelen Başvurular (Otel Yöneticileri ve İK Ekibi İçin) -->
+        <div class="applications-section">
+            <div class="section-sub-head">
+                <div>
+                    <h2>📥 Otellere Yapılan Personel Başvuruları</h2>
+                    <p class="muted">Adayların iletişim bilgileri, lojman talepleri ve deneyim detayları. Durumu tek tıkla güncelleyebilirsiniz.</p>
+                </div>
+            </div>
+
+            <div class="app-table-wrap">
+                <table class="app-table">
+                    <thead>
+                        <tr>
+                            <th>Aday Adı Soyadı</th>
+                            <th>Başvurulan Pozisyon</th>
+                            <th>Telefon & İletişim</th>
+                            <th>Mevcut Şehir</th>
+                            <th>Deneyim</th>
+                            <th>Lojman Talebi</th>
+                            <th>Başvuru Tarihi</th>
+                            <th>Durum</th>
+                            <th>İşlemler</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var app in applications)
+                        {
+                            <tr>
+                                <td>
+                                    <b>@app.FullName</b>
+                                    @if (!string.IsNullOrWhiteSpace(app.Notes))
+                                    {
+                                        <div class="app-notes-tooltip" title="@app.Notes">
+                                            📝 "@(app.Notes.Length > 45 ? app.Notes[..45] + "..." : app.Notes)"
+                                        </div>
+                                    }
+                                </td>
+                                <td>
+                                    <span class="pos-badge">@app.RoleApplied</span>
+                                </td>
+                                <td>
+                                    <a href="tel:@app.Phone" class="tel-btn">📞 @app.Phone</a>
+                                    @if (!string.IsNullOrWhiteSpace(app.Email))
+                                    {
+                                        <div class="muted-small">@app.Email</div>
+                                    }
+                                </td>
+                                <td>@app.CurrentCity</td>
+                                <td>@app.ExperienceYears</td>
+                                <td>
+                                    @if (app.NeedsAccommodation)
+                                    {
+                                        <span class="badge-lojman-req">🏠 Lojman İstiyor</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="badge-no-lojman">Kendi Evi</span>
+                                    }
+                                </td>
+                                <td>@app.AppliedAt.ToString("dd.MM.yyyy")</td>
+                                <td>
+                                    <select class="status-select @GetStatusClass(app.Status)" @onchange="(e) => UpdateAppStatus(app, e.Value?.ToString() ?? app.Status)">
+                                        <option value="Beklemede" selected="@(app.Status == "Beklemede")">Beklemede</option>
+                                        <option value="Arandı" selected="@(app.Status == "Arandı")">Arandı</option>
+                                        <option value="Mülakat" selected="@(app.Status == "Mülakat")">Mülakat</option>
+                                        <option value="Onaylandı" selected="@(app.Status == "Onaylandı")">İşe Alındı</option>
+                                    </select>
+                                </td>
+                                <td>
+                                    <a href="tel:@app.Phone" class="btn-call-mini">Ara</a>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    }
+    else if (activeTab == "cv")
+    {
+        <!-- İş Arayanlar Havuzu -->
+        <div class="cv-pool-section">
+            <div class="cv-hero-card">
+                <div class="cv-form-wrap">
+                    <h3>📝 İş Arıyorum — Profilini Otellere Bırak</h3>
+                    <p class="muted">Otel sahipleri ve insan kaynakları doğrudan bu havuzu tarayarak sizi arasın.</p>
+
+                    @if (candidateSubmitted)
+                    {
+                        <div class="cand-success">
+                            🎉 <b>Profiliniz CV havuzuna eklendi!</b> Otel yöneticileri uygun pozisyon olduğunda sizinle iletişime geçecektir.
+                        </div>
+                    }
+
+                    <div class="form-grid-2">
+                        <div class="form-row">
+                            <label>Adınız Soyadınız *</label>
+                            <input type="text" placeholder="Örn: Hasan Yılmaz" @bind="newCand.FullName" />
+                        </div>
+                        <div class="form-row">
+                            <label>Telefon Numaranız *</label>
+                            <input type="tel" placeholder="+90 5xx xxx xx xx" @bind="newCand.Phone" />
+                        </div>
+                    </div>
+
+                    <div class="form-grid-3">
+                        <div class="form-row">
+                            <label>İstediğiniz Pozisyon *</label>
+                            <select @bind="newCand.PreferredRole">
+                                <option value="Garson">🍽️ Garson</option>
+                                <option value="Komi">盆 Komi</option>
+                                <option value="Temizlik Görevlisi">🧹 Kat Hizmetleri / Temizlik</option>
+                                <option value="Resepsiyonist">🛎️ Resepsiyonist</option>
+                                <option value="Aşçı">👨‍🍳 Aşçı / Mutfak</option>
+                                <option value="Barmen">🍹 Barmen</option>
+                            </select>
+                        </div>
+                        <div class="form-row">
+                            <label>Yaşadığınız Şehir</label>
+                            <input type="text" placeholder="Örn: İzmir, Aydın, Muğla" @bind="newCand.City" />
+                        </div>
+                        <div class="form-row">
+                            <label>Deneyim Durumu</label>
+                            <select @bind="newCand.ExperienceYears">
+                                <option value="Yetiştirilmek Üzere">Yetiştirilmek Üzere</option>
+                                <option value="1 Yıl">1 Yıl</option>
+                                <option value="2-3 Yıl">2-3 Yıl</option>
+                                <option value="4+ Yıl">4+ Yıl (Usta)</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="checkbox-row">
+                        <label class="checkbox-label">
+                            <input type="checkbox" @bind="newCand.NeedsAccommodation" />
+                            <span>🏠 Yatılı / Lojmanlı çalışmak istiyorum</span>
+                        </label>
+                        <label class="checkbox-label">
+                            <input type="checkbox" @bind="newCand.ReadyImmediate" />
+                            <span>⚡ Hemen bugün iş başı yapabilirim</span>
+                        </label>
+                    </div>
+
+                    <div class="form-row">
+                        <label>Hakkınızda Kısa Bilgi & Referanslar</label>
+                        <textarea rows="2" placeholder="Daha önce çalıştığınız oteller, bildiğiniz yabancı diller veya notunuz..." @bind="newCand.Note"></textarea>
+                    </div>
+
+                    <button class="btn-primary-large" @onclick="SubmitCandidateProfile">
+                        🚀 Profilimi Otellerle Paylaş
+                    </button>
+                </div>
+            </div>
+
+            <!-- Kayıtlı Adaylar Listesi -->
+            <h3 style="margin: 40px 0 16px;">👥 Havuzdaki İş Arayan Adaylar (@candidates.Count)</h3>
+            <div class="candidates-grid">
+                @foreach (var c in candidates)
+                {
+                    <div class="cand-card">
+                        <div class="cand-header">
+                            <div>
+                                <b>@c.FullName</b>
+                                <div class="cand-role">🎯 @c.PreferredRole</div>
+                            </div>
+                            <span class="cand-city">📍 @c.City</span>
+                        </div>
+                        <div class="cand-tags">
+                            <span class="tag-exp">⏱️ @c.ExperienceYears</span>
+                            @if (c.NeedsAccommodation)
+                            {
+                                <span class="tag-loj">🏠 Lojman Talebi Var</span>
+                            }
+                            @if (c.ReadyImmediate)
+                            {
+                                <span class="tag-ready">⚡ Hemen Başlayabilir</span>
+                            }
+                        </div>
+                        @if (!string.IsNullOrWhiteSpace(c.Note))
+                        {
+                            <p class="cand-note">"@c.Note"</p>
+                        }
+                        <div class="cand-footer">
+                            <a href="tel:@c.Phone" class="btn-call">📞 @c.Phone</a>
+                        </div>
+                    </div>
+                }
+            </div>
+        </div>
+    }
+</div>
+
+<!-- Hızlı Başvuru Yap Modalı -->
+@if (showApplyModal && selectedJob != null)
+{
+    <div class="modal-backdrop" @onclick="() => showApplyModal = false">
+        <div class="modal-card" @onclick:stopPropagation>
+            <div class="modal-head">
+                <div>
+                    <h3>⚡ Hızlı Başvuru: @selectedJob.PositionName</h3>
+                    <p class="muted-small">@(selectedJob.Hotel?.Name ?? "Otel") · @selectedJob.City</p>
+                </div>
+                <button class="close-btn" @onclick="() => showApplyModal = false">✕</button>
+            </div>
+
+            <div class="modal-body">
+                @if (applySuccess)
+                {
+                    <div class="cand-success" style="padding:24px;text-align:center">
+                        <span style="font-size:3rem;display:block;margin-bottom:10px">🎉</span>
+                        <h4>Başvurunuz Otel Yönetimine İletildi!</h4>
+                        <p>Sayın <b>@applyName</b>, başvurunuz <b>@(selectedJob.Hotel?.Name)</b> İnsan Kaynakları yetkilisine teslim edilmiştir. En kısa sürede <b>@applyPhone</b> numaranız aranacaktır.</p>
+                        <button class="btn-primary-large" style="margin-top:16px" @onclick="() => showApplyModal = false">Tamam</button>
+                    </div>
+                }
+                else
+                {
+                    <div class="salary-highlight">
+                        💰 Maaş: <b>@selectedJob.SalaryRange</b> | 🏠 Lojman: @(selectedJob.AccommodationProvided ? "Sağlanır" : "Yok")
+                    </div>
+
+                    <div class="form-row">
+                        <label>Adınız Soyadınız *</label>
+                        <input type="text" placeholder="Adınız ve Soyadınız" @bind="applyName" />
+                    </div>
+
+                    <div class="form-grid-2">
+                        <div class="form-row">
+                            <label>Telefon Numaranız *</label>
+                            <input type="tel" placeholder="+90 5xx xxx xx xx" @bind="applyPhone" />
+                        </div>
+                        <div class="form-row">
+                            <label>Şu An Bulunduğunuz Şehir</label>
+                            <input type="text" placeholder="Örn: İzmir, Muğla, Antalya" @bind="applyCity" />
+                        </div>
+                    </div>
+
+                    <div class="form-grid-2">
+                        <div class="form-row">
+                            <label>Bu Alandaki Deneyiminiz</label>
+                            <select @bind="applyExp">
+                                <option value="Yetiştirilmek Üzere">Yetiştirilmek Üzere (Deneyimsiz)</option>
+                                <option value="1 Sezon">1 Sezon / 1 Yıl</option>
+                                <option value="2-3 Yıl">2-3 Yıl</option>
+                                <option value="4+ Yıl">4+ Yıl (Usta Personel)</option>
+                            </select>
+                        </div>
+                        <div class="form-row">
+                            <label>Lojman (Yatılı) İstiyor musunuz?</label>
+                            <select @bind="applyLojman">
+                                <option value="true">Evet, Lojman İstiyorum</option>
+                                <option value="false">Hayır, Kendi Evimde Kalacağım</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <label>Kendinizi Tanıtın / Notunuz</label>
+                        <textarea rows="3" placeholder="Daha önce çalıştığınız oteller, başlangıç yapabileceğiniz tarih vb..." @bind="applyNotes"></textarea>
+                    </div>
+
+                    <button class="btn-primary-large" style="width:100%;margin-top:12px" @onclick="SubmitApplication">
+                        🚀 Başvurumu Otele Gönder
+                    </button>
+                }
+            </div>
+        </div>
+    </div>
+}
+
+<!-- Yeni İlan Verme Modalı (Otel Yöneticileri İçin) -->
+@if (showNewJobModal)
+{
+    <div class="modal-backdrop" @onclick="() => showNewJobModal = false">
+        <div class="modal-card" @onclick:stopPropagation>
+            <div class="modal-head">
+                <h3>🏨 Yeni Personel İlanı Yayınla</h3>
+                <button class="close-btn" @onclick="() => showNewJobModal = false">✕</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-row">
+                    <label>İlan Başlığı *</label>
+                    <input type="text" placeholder="Örn: A la Carte Restoran Garsonu" @bind="newJobTitle" />
+                </div>
+
+                <div class="form-grid-2">
+                    <div class="form-row">
+                        <label>Pozisyon Kategorisi *</label>
+                        <select @bind="newJobCategory">
+                            <option value="@JobRoleCategory.Waiter">Garson (Servis)</option>
+                            <option value="@JobRoleCategory.Busboy">Komi (Garson Yardımcısı)</option>
+                            <option value="@JobRoleCategory.Housekeeping">Temizlik / Kat Hizmetleri</option>
+                            <option value="@JobRoleCategory.FrontDesk">Ön Büro / Resepsiyon</option>
+                            <option value="@JobRoleCategory.Kitchen">Mutfak & Aşçı</option>
+                            <option value="@JobRoleCategory.Bartender">Barmen / Barista</option>
+                        </select>
+                    </div>
+                    <div class="form-row">
+                        <label>Şehir / Konum *</label>
+                        <input type="text" placeholder="Örn: Bodrum / Muğla" @bind="newJobCity" />
+                    </div>
+                </div>
+
+                <div class="form-grid-2">
+                    <div class="form-row">
+                        <label>Maaş Aralığı *</label>
+                        <input type="text" placeholder="Örn: 32.000 ₺ - 38.000 ₺ + Tip" @bind="newJobSalary" />
+                    </div>
+                    <div class="form-row">
+                        <label>Çalışma Şekli</label>
+                        <input type="text" placeholder="Örn: Sezonluk (Mayıs - Ekim)" @bind="newJobWorkType" />
+                    </div>
+                </div>
+
+                <div class="checkbox-row" style="margin-bottom:14px">
+                    <label class="checkbox-label">
+                        <input type="checkbox" @bind="newJobLojman" />
+                        <span>🏠 Lojman Sağlanır</span>
+                    </label>
+                    <label class="checkbox-label">
+                        <input type="checkbox" @bind="newJobMeals" />
+                        <span>🍽️ 3 Öğün Yemek Dahil</span>
+                    </label>
+                </div>
+
+                <div class="form-row">
+                    <label>İş Tanımı</label>
+                    <textarea rows="2" placeholder="Görev ve sorumluluklar..." @bind="newJobDesc"></textarea>
+                </div>
+
+                <div class="form-row">
+                    <label>İletişim Telefon Numarası *</label>
+                    <input type="tel" placeholder="+90 252 555 xx xx" @bind="newJobPhone" />
+                </div>
+
+                <button class="btn-primary-large" style="width:100%;margin-top:12px" @onclick="SubmitNewJobPosting">
+                    ➕ İlanı Hemen Yayınla
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+<style>
+.jobs-page {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 30px 20px 80px;
+    color: #f1f5f9;
+}
+.jobs-hero {
+    text-align: center;
+    padding: 10px 0 30px;
+}
+.jobs-hero-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 16px;
+    border-radius: 999px;
+    background: hsla(217, 91%, 60%, 0.12);
+    border: 1px solid hsla(217, 91%, 60%, 0.3);
+    color: #38bdf8;
+    font-size: 0.88rem;
+    font-weight: 600;
+    margin-bottom: 16px;
+}
+.pulse-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #38bdf8;
+    box-shadow: 0 0 10px #38bdf8;
+}
+.jobs-hero h1 {
+    font-size: 2.6rem;
+    line-height: 1.25;
+    margin-bottom: 14px;
+    font-weight: 800;
+}
+.gradient-text {
+    background: linear-gradient(135deg, #38bdf8 0%, #2dd4bf 50%, #f59e0b 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+.hero-desc {
+    font-size: 1.1rem;
+    color: #94a3b8;
+    max-width: 760px;
+    margin: 0 auto 26px;
+    line-height: 1.6;
+}
+.hero-stats-row {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 20px;
+    flex-wrap: wrap;
+    margin-top: 10px;
+}
+.stat-box {
+    background: hsla(222, 47%, 14%, 0.9);
+    border: 1px solid hsla(217, 33%, 24%, 0.8);
+    border-radius: 14px;
+    padding: 10px 22px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+.stat-box .num {
+    font-size: 1.6rem;
+    font-weight: 800;
+    color: #2dd4bf;
+}
+.stat-box .lbl {
+    font-size: 0.8rem;
+    color: #94a3b8;
+}
+.hero-actions {
+    display: flex;
+    gap: 12px;
+    margin-left: 10px;
+}
+.btn-post-job {
+    background: linear-gradient(135deg, #0ea5e9, #0d9488);
+    color: #fff;
+    border: none;
+    padding: 12px 20px;
+    border-radius: 12px;
+    font-weight: 700;
+    font-size: 0.95rem;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+.btn-post-job:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 20px rgba(14, 165, 233, 0.4);
+}
+.btn-cv-pool {
+    background: hsla(217, 33%, 20%, 0.8);
+    color: #f1f5f9;
+    border: 1px solid hsla(217, 33%, 32%, 0.9);
+    padding: 12px 18px;
+    border-radius: 12px;
+    font-weight: 600;
+    font-size: 0.95rem;
+    cursor: pointer;
+}
+.btn-cv-pool:hover {
+    background: hsla(217, 33%, 26%, 1);
+}
+
+/* Sekmeler */
+.portal-nav-tabs {
+    display: flex;
+    gap: 8px;
+    border-bottom: 1px solid hsla(217, 33%, 22%, 0.8);
+    margin: 30px 0 24px;
+    padding-bottom: 2px;
+}
+.tab-btn {
+    background: transparent;
+    border: none;
+    color: #94a3b8;
+    padding: 12px 22px;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    border-bottom: 3px solid transparent;
+    transition: all 0.2s;
+}
+.tab-btn:hover {
+    color: #e2e8f0;
+}
+.tab-btn.active {
+    color: #2dd4bf;
+    border-bottom-color: #2dd4bf;
+}
+
+/* Filtreler */
+.filters-panel {
+    background: hsla(222, 47%, 13%, 0.7);
+    border: 1px solid hsla(217, 33%, 22%, 0.8);
+    border-radius: 18px;
+    padding: 18px 20px;
+    margin-bottom: 26px;
+}
+.role-pills {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-bottom: 16px;
+}
+.role-pills .pill {
+    background: hsla(217, 33%, 18%, 0.7);
+    border: 1px solid hsla(217, 33%, 26%, 0.8);
+    color: #cbd5e1;
+    padding: 7px 16px;
+    border-radius: 999px;
+    font-size: 0.88rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+.role-pills .pill.active, .role-pills .pill:hover {
+    background: #0ea5e9;
+    border-color: #0ea5e9;
+    color: #fff;
+}
+.search-row {
+    display: flex;
+    gap: 14px;
+    align-items: center;
+    flex-wrap: wrap;
+}
+.search-input-wrap {
+    flex: 1;
+    min-width: 260px;
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+.search-input-wrap .icon {
+    position: absolute;
+    left: 14px;
+    color: #64748b;
+}
+.search-input-wrap input {
+    width: 100%;
+    padding: 10px 14px 10px 40px;
+    border-radius: 10px;
+    background: #0f172a;
+    border: 1px solid #334155;
+    color: #fff;
+    outline: none;
+}
+.search-input-wrap input:focus {
+    border-color: #0ea5e9;
+}
+.select-wrap select {
+    padding: 10px 16px;
+    border-radius: 10px;
+    background: #0f172a;
+    border: 1px solid #334155;
+    color: #fff;
+    outline: none;
+    cursor: pointer;
+}
+.checkbox-label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.88rem;
+    color: #cbd5e1;
+    cursor: pointer;
+}
+
+/* İlan Kartları */
+.job-cards-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+    gap: 22px;
+}
+.job-card {
+    background: hsla(222, 47%, 13%, 0.85);
+    border: 1px solid hsla(217, 33%, 22%, 0.8);
+    border-radius: 20px;
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+    transition: all 0.25s ease;
+}
+.job-card:hover {
+    border-color: hsla(172, 78%, 52%, 0.4);
+    transform: translateY(-3px);
+    box-shadow: 0 12px 30px -10px rgba(0, 0, 0, 0.5);
+}
+.job-card-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+}
+.role-category-tag {
+    background: hsla(217, 91%, 60%, 0.15);
+    color: #38bdf8;
+    padding: 4px 12px;
+    border-radius: 8px;
+    font-size: 0.82rem;
+    font-weight: 700;
+}
+.work-type-badge {
+    background: hsla(142, 76%, 36%, 0.15);
+    color: #34d399;
+    padding: 3px 10px;
+    border-radius: 6px;
+    font-size: 0.78rem;
+    font-weight: 600;
+}
+.job-title {
+    font-size: 1.25rem;
+    margin: 0 0 10px;
+    color: #fff;
+    line-height: 1.35;
+}
+.hotel-meta {
+    display: flex;
+    gap: 12px;
+    font-size: 0.88rem;
+    color: #94a3b8;
+    margin-bottom: 14px;
+    flex-wrap: wrap;
+}
+.hotel-meta .location {
+    color: #cbd5e1;
+}
+.perks-row {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    margin-bottom: 14px;
+    flex-wrap: wrap;
+}
+.salary-tag {
+    background: hsla(38, 92%, 50%, 0.15);
+    color: #fbbf24;
+    border: 1px solid hsla(38, 92%, 50%, 0.3);
+    padding: 4px 12px;
+    border-radius: 8px;
+    font-size: 0.88rem;
+}
+.perk-badge {
+    padding: 4px 10px;
+    border-radius: 6px;
+    font-size: 0.78rem;
+    font-weight: 600;
+}
+.perk-badge.lodg {
+    background: hsla(262, 83%, 58%, 0.18);
+    color: #c084fc;
+}
+.perk-badge.meal {
+    background: hsla(172, 78%, 52%, 0.18);
+    color: #2dd4bf;
+}
+.job-desc {
+    font-size: 0.9rem;
+    color: #94a3b8;
+    line-height: 1.5;
+    margin: 0 0 14px;
+    flex-grow: 1;
+}
+.requirements-box {
+    background: hsla(220, 40%, 10%, 0.5);
+    border-left: 3px solid #0ea5e9;
+    padding: 8px 12px;
+    border-radius: 0 8px 8px 0;
+    margin-bottom: 18px;
+}
+.job-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-top: 14px;
+    border-top: 1px solid hsla(217, 33%, 20%, 0.8);
+}
+.phone-link {
+    color: #38bdf8;
+    font-weight: 600;
+    font-size: 0.88rem;
+    text-decoration: none;
+    display: block;
+}
+.btn-apply {
+    background: linear-gradient(135deg, #0ea5e9, #0d9488);
+    color: #fff;
+    border: none;
+    padding: 9px 18px;
+    border-radius: 10px;
+    font-weight: 700;
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+.btn-apply:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(14, 165, 233, 0.4);
+}
+
+/* Başvurular Tablosu */
+.applications-section {
+    background: hsla(222, 47%, 13%, 0.8);
+    border: 1px solid hsla(217, 33%, 22%, 0.8);
+    border-radius: 20px;
+    padding: 24px;
+}
+.section-sub-head {
+    margin-bottom: 20px;
+}
+.section-sub-head h2 {
+    font-size: 1.4rem;
+    margin: 0 0 6px;
+}
+.app-table-wrap {
+    overflow-x: auto;
+}
+.app-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.88rem;
+}
+.app-table th {
+    text-align: left;
+    padding: 12px 14px;
+    border-bottom: 1px solid #334155;
+    color: #94a3b8;
+    font-weight: 600;
+}
+.app-table td {
+    padding: 14px;
+    border-bottom: 1px solid hsla(217, 33%, 18%, 0.8);
+}
+.pos-badge {
+    background: hsla(217, 91%, 60%, 0.15);
+    color: #38bdf8;
+    padding: 3px 8px;
+    border-radius: 6px;
+    font-weight: 600;
+    font-size: 0.82rem;
+}
+.tel-btn {
+    color: #2dd4bf;
+    text-decoration: none;
+    font-weight: 600;
+}
+.badge-lojman-req {
+    color: #c084fc;
+    font-size: 0.82rem;
+    font-weight: 600;
+}
+.badge-no-lojman {
+    color: #94a3b8;
+    font-size: 0.82rem;
+}
+.status-select {
+    padding: 4px 8px;
+    border-radius: 6px;
+    background: #1e293b;
+    border: 1px solid #334155;
+    color: #fff;
+    font-size: 0.82rem;
+}
+.status-select.st-beklemede { border-color: #f59e0b; color: #f59e0b; }
+.status-select.st-arandi { border-color: #38bdf8; color: #38bdf8; }
+.status-select.st-mulakat { border-color: #c084fc; color: #c084fc; }
+.status-select.st-onay { border-color: #10b981; color: #10b981; }
+.btn-call-mini {
+    background: hsla(172, 78%, 52%, 0.15);
+    color: #2dd4bf;
+    border: 1px solid hsla(172, 78%, 52%, 0.3);
+    padding: 4px 10px;
+    border-radius: 6px;
+    text-decoration: none;
+    font-size: 0.8rem;
+    font-weight: 600;
+}
+
+/* CV Havuzu */
+.cv-hero-card {
+    background: linear-gradient(145deg, hsla(222, 47%, 14%, 0.95), hsla(222, 47%, 9%, 0.95));
+    border: 1px solid hsla(217, 33%, 25%, 0.8);
+    border-radius: 20px;
+    padding: 30px;
+}
+.cv-form-wrap h3 {
+    margin: 0 0 6px;
+    font-size: 1.4rem;
+}
+.candidates-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 18px;
+}
+.cand-card {
+    background: hsla(222, 47%, 13%, 0.85);
+    border: 1px solid hsla(217, 33%, 22%, 0.8);
+    border-radius: 16px;
+    padding: 20px;
+}
+.cand-header {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 10px;
+}
+.cand-role {
+    color: #38bdf8;
+    font-size: 0.88rem;
+    font-weight: 600;
+    margin-top: 3px;
+}
+.cand-city {
+    font-size: 0.82rem;
+    color: #94a3b8;
+}
+.cand-tags {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 12px;
+    flex-wrap: wrap;
+}
+.cand-tags span {
+    padding: 3px 8px;
+    border-radius: 6px;
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+.tag-exp { background: hsla(217, 33%, 20%, 0.8); color: #cbd5e1; }
+.tag-loj { background: hsla(262, 83%, 58%, 0.15); color: #c084fc; }
+.tag-ready { background: hsla(142, 76%, 36%, 0.15); color: #34d399; }
+.cand-note {
+    font-size: 0.85rem;
+    color: #94a3b8;
+    font-style: italic;
+    margin: 0 0 14px;
+    line-height: 1.4;
+}
+.cand-footer .btn-call {
+    display: inline-block;
+    width: 100%;
+    text-align: center;
+    background: hsla(172, 78%, 52%, 0.15);
+    border: 1px solid hsla(172, 78%, 52%, 0.3);
+    color: #2dd4bf;
+    padding: 8px;
+    border-radius: 8px;
+    text-decoration: none;
+    font-weight: 600;
+    font-size: 0.88rem;
+}
+.cand-success {
+    background: hsla(142, 76%, 36%, 0.15);
+    border: 1px solid #10b981;
+    color: #34d399;
+    padding: 12px 16px;
+    border-radius: 10px;
+    margin-bottom: 18px;
+}
+
+/* Form stilleri */
+.form-row { margin-bottom: 12px; }
+.form-row label {
+    display: block;
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: #cbd5e1;
+    margin-bottom: 4px;
+}
+.form-row input, .form-row select, .form-row textarea {
+    width: 100%;
+    padding: 9px 12px;
+    border-radius: 8px;
+    background: #0f172a;
+    border: 1px solid #334155;
+    color: #fff;
+    outline: none;
+    font-family: inherit;
+}
+.form-row input:focus, .form-row select:focus, .form-row textarea:focus {
+    border-color: #2dd4bf;
+}
+.form-grid-2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+}
+.form-grid-3 {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 12px;
+}
+.checkbox-row {
+    display: flex;
+    gap: 20px;
+    margin: 10px 0 14px;
+    flex-wrap: wrap;
+}
+.btn-primary-large {
+    background: linear-gradient(135deg, #0ea5e9, #0d9488);
+    color: #fff;
+    border: none;
+    padding: 12px 20px;
+    border-radius: 10px;
+    font-size: 1rem;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+/* Modallar */
+.modal-backdrop {
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0, 0, 0, 0.75);
+    backdrop-filter: blur(6px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    padding: 20px;
+}
+.modal-card {
+    background: #0f172a;
+    border: 1px solid #334155;
+    border-radius: 20px;
+    max-width: 540px;
+    width: 100%;
+    padding: 26px;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7);
+    max-height: 90vh;
+    overflow-y: auto;
+}
+.modal-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 16px;
+}
+.modal-head h3 { margin: 0; font-size: 1.25rem; }
+.muted-small { font-size: 0.8rem; color: #94a3b8; }
+.close-btn {
+    background: transparent;
+    border: none;
+    color: #94a3b8;
+    font-size: 1.2rem;
+    cursor: pointer;
+}
+.salary-highlight {
+    background: hsla(38, 92%, 50%, 0.12);
+    border: 1px solid hsla(38, 92%, 50%, 0.25);
+    color: #fbbf24;
+    padding: 8px 12px;
+    border-radius: 8px;
+    font-size: 0.88rem;
+    margin-bottom: 16px;
+}
+.no-results-card {
+    grid-column: 1 / -1;
+    text-align: center;
+    padding: 60px 20px;
+    background: hsla(222, 47%, 13%, 0.5);
+    border-radius: 18px;
+}
+.btn-clear {
+    background: #0ea5e9;
+    color: #fff;
+    border: none;
+    padding: 8px 18px;
+    border-radius: 8px;
+    font-weight: 600;
+    cursor: pointer;
+    margin-top: 10px;
+}
+</style>
+
+@code {
+    string activeTab = "jobs"; // "jobs", "applications", "cv"
+    JobRoleCategory? selectedCategory = null;
+    string selectedCity = "";
+    string searchQuery = "";
+    bool onlyWithAccommodation = false;
+
+    List<JobPosting> postings = new();
+    List<JobApplication> applications = new();
+    List<JobCandidatePool> candidates = new();
+
+    // Başvuru Modalı
+    bool showApplyModal = false;
+    bool applySuccess = false;
+    JobPosting? selectedJob = null;
+    string applyName = "";
+    string applyPhone = "";
+    string applyCity = "";
+    string applyExp = "1 Sezon";
+    string applyLojman = "true";
+    string applyNotes = "";
+
+    // Yeni İlan Modalı
+    bool showNewJobModal = false;
+    string newJobTitle = "";
+    JobRoleCategory newJobCategory = JobRoleCategory.Waiter;
+    string newJobCity = "Bodrum / Muğla";
+    string newJobSalary = "34.000 ₺ - 42.000 ₺ + Tip";
+    string newJobWorkType = "Sezonluk (Mayıs - Ekim)";
+    bool newJobLojman = true;
+    bool newJobMeals = true;
+    string newJobDesc = "";
+    string newJobPhone = "+90 252 555 01 10";
+
+    // CV Bırakma Formu
+    JobCandidatePool newCand = new() { PreferredRole = "Garson", ExperienceYears = "1 Yıl", NeedsAccommodation = true, ReadyImmediate = true };
+    bool candidateSubmitted = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadDataAsync();
+    }
+
+    async Task LoadDataAsync()
+    {
+        using var db = await DbFactory.CreateDbContextAsync();
+        postings = await db.JobPostings.Include(j => j.Hotel).OrderByDescending(j => j.CreatedAt).ToListAsync();
+        applications = await db.JobApplications.Include(a => a.JobPosting).OrderByDescending(a => a.AppliedAt).ToListAsync();
+        candidates = await db.JobCandidates.OrderByDescending(c => c.CreatedAt).ToListAsync();
+    }
+
+    List<JobPosting> filteredPostings => postings
+        .Where(p => selectedCategory == null || p.Category == selectedCategory)
+        .Where(p => string.IsNullOrWhiteSpace(selectedCity) || p.City.Contains(selectedCity))
+        .Where(p => !onlyWithAccommodation || p.AccommodationProvided)
+        .Where(p => string.IsNullOrWhiteSpace(searchQuery) ||
+                    p.Title.Contains(searchQuery, StringComparison.OrdinalIgnoreCase) ||
+                    p.PositionName.Contains(searchQuery, StringComparison.OrdinalIgnoreCase) ||
+                    p.City.Contains(searchQuery, StringComparison.OrdinalIgnoreCase) ||
+                    (p.Hotel != null && p.Hotel.Name.Contains(searchQuery, StringComparison.OrdinalIgnoreCase)))
+        .ToList();
+
+    void ClearFilters()
+    {
+        selectedCategory = null;
+        selectedCity = "";
+        searchQuery = "";
+        onlyWithAccommodation = false;
+    }
+
+    string GetRoleEmoji(JobRoleCategory cat) => cat switch
+    {
+        JobRoleCategory.Waiter => "🍽️",
+        JobRoleCategory.Busboy => "盆",
+        JobRoleCategory.Housekeeping => "🧹",
+        JobRoleCategory.FrontDesk => "🛎️",
+        JobRoleCategory.Kitchen => "👨‍🍳",
+        JobRoleCategory.Bartender => "🍹",
+        _ => "🏨"
+    };
+
+    string GetStatusClass(string st) => st switch
+    {
+        "Beklemede" => "st-beklemede",
+        "Arandı" => "st-arandi",
+        "Mülakat" => "st-mulakat",
+        "Onaylandı" => "st-onay",
+        _ => ""
+    };
+
+    void OpenApplyModal(JobPosting job)
+    {
+        selectedJob = job;
+        applySuccess = false;
+        showApplyModal = true;
+    }
+
+    async Task SubmitApplication()
+    {
+        if (selectedJob == null) return;
+        if (string.IsNullOrWhiteSpace(applyName) || string.IsNullOrWhiteSpace(applyPhone)) return;
+
+        using var db = await DbFactory.CreateDbContextAsync();
+        var app = new JobApplication
+        {
+            JobPostingId = selectedJob.Id,
+            FullName = applyName,
+            Phone = applyPhone,
+            CurrentCity = string.IsNullOrWhiteSpace(applyCity) ? selectedJob.City : applyCity,
+            ExperienceYears = applyExp,
+            RoleApplied = selectedJob.PositionName,
+            NeedsAccommodation = applyLojman == "true",
+            Notes = applyNotes,
+            Status = "Beklemede",
+            AppliedAt = DateTime.Now
+        };
+        db.JobApplications.Add(app);
+        await db.SaveChangesAsync();
+
+        applySuccess = true;
+        await LoadDataAsync();
+    }
+
+    async Task UpdateAppStatus(JobApplication app, string newStatus)
+    {
+        using var db = await DbFactory.CreateDbContextAsync();
+        var dbApp = await db.JobApplications.FindAsync(app.Id);
+        if (dbApp != null)
+        {
+            dbApp.Status = newStatus;
+            await db.SaveChangesAsync();
+            app.Status = newStatus;
+        }
+    }
+
+    async Task SubmitCandidateProfile()
+    {
+        if (string.IsNullOrWhiteSpace(newCand.FullName) || string.IsNullOrWhiteSpace(newCand.Phone)) return;
+
+        using var db = await DbFactory.CreateDbContextAsync();
+        var cand = new JobCandidatePool
+        {
+            FullName = newCand.FullName,
+            Phone = newCand.Phone,
+            City = string.IsNullOrWhiteSpace(newCand.City) ? "Belirtilmedi" : newCand.City,
+            PreferredRole = newCand.PreferredRole,
+            ExperienceYears = newCand.ExperienceYears,
+            NeedsAccommodation = newCand.NeedsAccommodation,
+            ReadyImmediate = newCand.ReadyImmediate,
+            Note = newCand.Note,
+            CreatedAt = DateTime.Now
+        };
+        db.JobCandidates.Add(cand);
+        await db.SaveChangesAsync();
+
+        candidateSubmitted = true;
+        newCand = new() { PreferredRole = "Garson", ExperienceYears = "1 Yıl", NeedsAccommodation = true, ReadyImmediate = true };
+        await LoadDataAsync();
+    }
+
+    async Task SubmitNewJobPosting()
+    {
+        if (string.IsNullOrWhiteSpace(newJobTitle) || string.IsNullOrWhiteSpace(newJobPhone)) return;
+
+        using var db = await DbFactory.CreateDbContextAsync();
+        var hotel = await db.Hotels.FirstOrDefaultAsync();
+        if (hotel == null) return;
+
+        var job = new JobPosting
+        {
+            HotelId = hotel.Id,
+            Title = newJobTitle,
+            Category = newJobCategory,
+            PositionName = newJobCategory switch
+            {
+                JobRoleCategory.Waiter => "Garson",
+                JobRoleCategory.Busboy => "Komi",
+                JobRoleCategory.Housekeeping => "Kat Hizmetleri / Temizlik",
+                JobRoleCategory.FrontDesk => "Resepsiyonist",
+                JobRoleCategory.Kitchen => "Aşçı",
+                JobRoleCategory.Bartender => "Barmen",
+                _ => "Personel"
+            },
+            City = newJobCity,
+            SalaryRange = newJobSalary,
+            WorkType = newJobWorkType,
+            AccommodationProvided = newJobLojman,
+            MealsIncluded = newJobMeals,
+            Description = newJobDesc,
+            Requirements = "İletişimi güçlü, ekip çalışmasına yatkın.",
+            ContactPhone = newJobPhone,
+            IsActive = true,
+            CreatedAt = DateTime.Now
+        };
+
+        db.JobPostings.Add(job);
+        await db.SaveChangesAsync();
+
+        showNewJobModal = false;
+        await LoadDataAsync();
+    }
+}

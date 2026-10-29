@@ -1,0 +1,1154 @@
+@page "/yield-radar"
+@layout Otel.Web.Components.Layout.PublicLayout
+@inject YieldRadarService YieldService
+@inject IJSRuntime JS
+
+<PageTitle>Canlı Uçuş, Konser & Hava Durumu Destekli AI Gelir Radarı | OtelPro</PageTitle>
+
+<div class="yield-radar-shell">
+    <!-- Hero Bölümü -->
+    <div class="radar-hero">
+        <div class="hero-chip-row">
+            <span class="live-pill"><span class="pulse-dot"></span> CANLI GELİR & TALEP RADARI</span>
+            <span class="hero-subchip">✈️ HAVALİMANI & UÇUŞ TELEMETRİSİ</span>
+            <span class="hero-subchip">🎟️ STADYUM KONSERLERİ & KONGRELER</span>
+            <span class="hero-subchip">⚡ ANLIK DİNAMİK FİYATLANDIRMA</span>
+        </div>
+
+        <h1 class="radar-title">
+            <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#38bdf8" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:middle;margin-right:8px;filter:drop-shadow(0 0 8px rgba(56,189,248,0.5))">
+                <path d="M3 3v18h18" />
+                <path d="M18 9l-5 5-4-4-6 6" />
+                <path d="M14 9h4v4" />
+            </svg>
+            Uçuş, Konser & Hava Durumu Destekli <span>Yapay Zeka Gelir Radarı</span>
+        </h1>
+        <p class="radar-desc">
+            Bölgenizdeki havalimanı iniş yolcu hacmini, stadyum konserlerini, uluslararası kongreleri ve hava durumu dalgalanmalarını
+            anlık analiz ederek oda fiyatlarınızı otomatik optimize eden (Dinamik Fiyatlandırma) ve tek tıkla küresel OTA kanallarına ileten yeni nesil Gelir Yönetimi (Yield Management) ekosistemi.
+        </p>
+
+        <!-- Otel / Tesis Seçim Çubuğu -->
+        <div class="hotel-picker-bar">
+            <div class="picker-label">
+                <span>🏢 İZLENEN TESİS & DESTİNASYON:</span>
+            </div>
+            <select class="hotel-select" value="@selectedHotelId" @onchange="OnHotelChanged">
+                @foreach (var h in hotels)
+                {
+                    <option value="@h.Id">🏨 @h.Name — @h.City</option>
+                }
+            </select>
+            <div class="picker-quick-stats">
+                <span>📍 @selectedHotel?.City</span>
+                <span>•</span>
+                <span>⭐ @(selectedHotel?.Stars ?? 5) Yıldız Tesis</span>
+                <span>•</span>
+                <span style="color:#38bdf8">🛫 @airportSummary?.AirportCode Bölge Hub</span>
+            </div>
+        </div>
+    </div>
+
+    @if (selectedHotel != null && surgeAnalysis != null)
+    {
+        <!-- Üst Metrik Şeritleri (KPI Cards) -->
+        <div class="metrics-grid">
+            <div class="metric-card">
+                <div class="metric-head">
+                    <span class="m-ico">✈️</span>
+                    <span class="m-title">Havalimanı Gelen Yolcu</span>
+                    <span class="m-badge up">+@airportSummary?.GrowthVsLastWeek%</span>
+                </div>
+                <div class="metric-val">~@airportSummary?.TotalInboundPassengers.ToString("N0") <small>Yolcu/Gün</small></div>
+                <div class="metric-sub">
+                    <span style="color:#34d399;font-weight:700">🎯 @TotalArrivingHotelGuests Misafirimiz Uçuşta</span>
+                    <span>•</span>
+                    <span style="color:#fbbf24">@airportSummary?.PrivateJetLandings VIP Özel Jet</span>
+                </div>
+            </div>
+
+            <div class="metric-card">
+                <div class="metric-head">
+                    <span class="m-ico">🎟️</span>
+                    <span class="m-title">Şehir Etkinlik Hacmi</span>
+                    <span class="m-badge">@cityEvents.Count Büyük Olay</span>
+                </div>
+                <div class="metric-val">@TotalExpectedAttendance.ToString("N0") <small>Toplam Katılımcı</small></div>
+                <div class="metric-sub">
+                    <span>Ort. %94 Bilet Tükenme</span>
+                    <span>•</span>
+                    <span style="color:#ec4899">Konser & Kongreler</span>
+                </div>
+            </div>
+
+            <div class="metric-card">
+                <div class="metric-head">
+                    <span class="m-ico">@weatherImpact?.ConditionIcon</span>
+                    <span class="m-title">Turizm İklim Skoru</span>
+                    <span class="m-badge ok">@weatherImpact?.TourismDemandScore / 100</span>
+                </div>
+                <div class="metric-val">@weatherImpact?.TempC°C <small>Deniz @weatherImpact?.SeaTempC°C</small></div>
+                <div class="metric-sub">
+                    <span style="color:#38bdf8">@weatherImpact?.Condition</span>
+                    <span>•</span>
+                    <span>UV @weatherImpact?.UvIndex</span>
+                </div>
+            </div>
+
+            <div class="metric-card highlight">
+                <div class="metric-head">
+                    <span class="m-ico">⚡</span>
+                    <span class="m-title">Dinamik Fiyat & Gelir Çarpanı</span>
+                    <span class="m-badge surge" style="background:@surgeAnalysis.LevelColor;color:#fff">@surgeAnalysis.DemandIndex / 100 Talep</span>
+                </div>
+                <div class="metric-val" style="color:#38bdf8">
+                    @surgeAnalysis.SurgeMultiplier.ToString("F2")x
+                    <small style="color:#34d399">(@Fmt.Money(surgeAnalysis.SurgedAdr))</small>
+                </div>
+                <div class="metric-sub">
+                    <span>Hafta Sonu +@Fmt.Money(surgeAnalysis.ProjectedRevenueLift) Ek Gelir</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- 3 Sütunlu Ana Radar Kokpiti -->
+        <div class="cockpit-grid">
+            <!-- 1. SÜTUN: Canlı Uçuş Telemetrisi & Misafir Radarı -->
+            <div class="panel-box">
+                <div class="panel-head">
+                    <div class="head-left">
+                        <span class="p-ico">📡</span>
+                        <div>
+                            <h4>Canlı Uçuş & Misafir Radarı</h4>
+                            <small>@airportSummary?.AirportName</small>
+                        </div>
+                    </div>
+                    <div style="display:flex;align-items:center;gap:6px">
+                        <span class="panel-tag live">🔴 Canlı Telemetri</span>
+                    </div>
+                </div>
+
+                <!-- Canlı ADS-B 1090 MHz & METAR Şeridi -->
+                <div class="adsb-metar-ticker">
+                    <span class="adsb-live-badge"><span class="pulse-dot"></span> ADS-B 1090 MHz Mode-S: AKTİF</span>
+                    <span class="adsb-runway-badge">🛫 @(airportSummary?.ActiveRunway ?? "Pist 36R")</span>
+                    <span>💨 @(airportSummary?.WindCondition ?? "330°/11kt")</span>
+                    <span class="adsb-metar-code">@airportSummary?.Metar</span>
+                </div>
+
+                <!-- Görünüm Seçici Sekmeleri: Görsel Radar vs FIDS Tablosu -->
+                <div class="radar-view-mode-tabs">
+                    <button class="radar-tab-btn @(isRadarViewMode ? "active" : "")" @onclick="() => isRadarViewMode = true">
+                        📡 Görsel Hava Sahası Radarı
+                    </button>
+                    <button class="radar-tab-btn @(!isRadarViewMode ? "active" : "")" @onclick="() => isRadarViewMode = false">
+                        📋 Detaylı Uçuş & FIDS Tablosu (@inboundFlights.Count)
+                    </button>
+                </div>
+
+                <!-- Havalimanı Özet KPI Şeridi -->
+                <div class="airport-kpi-bar">
+                    <div class="kpi-mini">
+                        <span class="k-label">GÜNLÜK UÇUŞ</span>
+                        <b class="k-val">@airportSummary?.TotalFlightsToday</b>
+                    </div>
+                    <div class="kpi-mini">
+                        <span class="k-label">DOLULUK ORANI</span>
+                        <b class="k-val" style="color:#38bdf8">%@airportSummary?.AverageLoadFactor.ToString("F1")</b>
+                    </div>
+                    <div class="kpi-mini">
+                        <span class="k-label">MİSAFİR UÇUŞTA</span>
+                        <b class="k-val" style="color:#34d399">@TotalArrivingHotelGuests Kişi</b>
+                    </div>
+                </div>
+
+                @if (isRadarViewMode)
+                {
+                    <!-- ================= GÖRSEL HAVA SAHASI RADARI EKRANI ================= -->
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+                        <div style="font-size:0.72rem;color:#94a3b8">
+                            <span>🎯 Hedef kilidi için uçağa tıklayın</span>
+                            @if (FlightsWithGuestsCount > 0)
+                            {
+                                <span style="color:#fbbf24;margin-left:8px">👑 (@FlightsWithGuestsCount Uçakta Misafirimiz Var)</span>
+                            }
+                        </div>
+                        <button class="btn sm" style="font-size:0.68rem;padding:2px 8px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);color:#cbd5e1" @onclick="ToggleSweepPause">
+                            @(isRadarSweepPaused ? "▶️ Taramayı Başlat" : "⏸️ Taramayı Duraklat")
+                        </button>
+                    </div>
+
+                    <div class="cockpit-radar-scope">
+                        <!-- Sweep Beam -->
+                        <div class="radar-sweep-beam @(isRadarSweepPaused ? "paused" : "")"></div>
+
+                        <!-- Concentric Range Rings (20, 40, 60, 80, 100 NM) -->
+                        <div class="radar-ring r-20"><span class="radar-ring-label">20 NM</span></div>
+                        <div class="radar-ring r-40"><span class="radar-ring-label">40 NM</span></div>
+                        <div class="radar-ring r-60"><span class="radar-ring-label">60 NM</span></div>
+                        <div class="radar-ring r-80"><span class="radar-ring-label">80 NM</span></div>
+                        <div class="radar-ring r-100"><span class="radar-ring-label">100 NM</span></div>
+
+                        <!-- Compass Crosshairs -->
+                        <div class="radar-crosshair-h"></div>
+                        <div class="radar-crosshair-v"></div>
+
+                        <!-- Compass Azimuth Labels -->
+                        <span class="radar-azimuth-mark n">000° N</span>
+                        <span class="radar-azimuth-mark s">180° S</span>
+                        <span class="radar-azimuth-mark e">090° E</span>
+                        <span class="radar-azimuth-mark w">270° W</span>
+
+                        <!-- Runway Centerline Axis -->
+                        <div class="radar-runway-axis">
+                            <span class="radar-runway-label">RWY 36R (ILS)</span>
+                        </div>
+
+                        <!-- Center Airport Hub -->
+                        <div class="radar-center-hub">
+                            <div class="center-hub-dot"></div>
+                            <div class="center-hub-code">🎯 @airportSummary?.AirportCode</div>
+                        </div>
+
+                        <!-- Aircraft Blips -->
+                        @foreach (var f in inboundFlights)
+                        {
+                            var isSelected = selectedFlightForHud == f;
+                            var hasGuests = f.ArrivingGuests.Any();
+                            <div class="plane-blip @(hasGuests ? "has-guests" : "") @(isSelected ? "selected" : "")"
+                                 style="@GetBlipStyle(f)"
+                                 @onclick="() => SelectFlightForHud(f)"
+                                 title="@f.FlightNumber - @f.OriginCity (@f.AirlineName)">
+                                
+                                <div class="plane-blip-icon-wrap">
+                                    @if (hasGuests)
+                                    {
+                                        <div class="vip-guest-beacon"></div>
+                                    }
+                                    @if (isSelected)
+                                    {
+                                        <div class="hud-reticle-box"></div>
+                                    }
+                                    <svg class="plane-blip-svg" viewBox="0 0 24 24" style="@GetPlaneRotation(f)">
+                                        <path d="M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z"/>
+                                    </svg>
+                                </div>
+
+                                <div class="plane-blip-tag">
+                                    <span class="bt-callsign">
+                                        @if (hasGuests) { <span>👑 </span> }
+                                        @f.FlightNumber
+                                    </span>
+                                    <span class="bt-sub">@((f.AltitudeFt / 1000.0).ToString("F1"))k ft · @(f.SpeedKnots)kt</span>
+                                </div>
+                            </div>
+                        }
+                    </div>
+
+                    <!-- Target Lock HUD Strip -->
+                    @if (selectedFlightForHud != null)
+                    {
+                        <div class="radar-hud-strip">
+                            <div class="hud-head-row">
+                                <div class="hud-callsign-box">
+                                    <span class="hud-ico">🎯</span>
+                                    <b>@selectedFlightForHud.FlightNumber</b>
+                                    <span>· @selectedFlightForHud.AirlineName (@selectedFlightForHud.AircraftType)</span>
+                                </div>
+                                <span class="panel-tag active" style="font-size:0.65rem">@selectedFlightForHud.Status</span>
+                            </div>
+
+                            <div class="hud-telemetry-grid">
+                                <div class="hud-tel-item">
+                                    <small>İRTİFA</small>
+                                    <b>@selectedFlightForHud.AltitudeFt.ToString("N0") FT</b>
+                                </div>
+                                <div class="hud-tel-item">
+                                    <small>HAVA HIZI</small>
+                                    <b>@selectedFlightForHud.SpeedKnots KT</b>
+                                </div>
+                                <div class="hud-tel-item">
+                                    <small>PUSULA BAŞ</small>
+                                    <b>@selectedFlightForHud.HeadingDeg°</b>
+                                </div>
+                                <div class="hud-tel-item">
+                                    <small>MESAFE</small>
+                                    <b>@selectedFlightForHud.DistanceNm NM</b>
+                                </div>
+                            </div>
+
+                            @if (selectedFlightForHud.ArrivingGuests.Any())
+                            {
+                                <div class="hud-guests-alert">
+                                    <div class="hga-left">
+                                        <span style="font-size:1.1rem">👑</span>
+                                        <div>
+                                            <b>@selectedFlightForHud.ArrivingGuests.Count Otel Misafirimiz Bu Uçakta!</b>
+                                            <div style="font-size:0.68rem;color:#fde68a">
+                                                @string.Join(", ", selectedFlightForHud.ArrivingGuests.Select(g => $"{g.GuestName} (Oda {g.RoomNumber})"))
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <button class="btn-open-dossier" @onclick="() => OpenFlightModal(selectedFlightForHud)">
+                                        VIP Karşılama Kartı ➔
+                                    </button>
+                                </div>
+                            }
+                            else
+                            {
+                                <div style="display:flex;justify-content:space-between;align-items:center;font-size:0.7rem;color:#94a3b8;padding-top:4px">
+                                    <span>Rota: @selectedFlightForHud.OriginCity ➔ @airportSummary?.AirportCode (Tahsis: @selectedFlightForHud.Runway)</span>
+                                    <button class="btn sm" style="font-size:0.68rem;padding:3px 8px" @onclick="() => OpenFlightModal(selectedFlightForHud)">
+                                        Uçuş Detayı ➔
+                                    </button>
+                                </div>
+                            }
+                        </div>
+                    }
+                }
+                else
+                {
+                    <!-- ================= DETAYLI UÇUŞ & FIDS TABLOSU GÖRÜNÜMÜ ================= -->
+                    <div class="flight-filter-row">
+                        <button class="f-filter-btn @(!filterOnlyHotelGuests ? "active" : "")" @onclick="() => filterOnlyHotelGuests = false">
+                            ✈️ Tüm Uçuşlar (@inboundFlights.Count)
+                        </button>
+                        <button class="f-filter-btn @(filterOnlyHotelGuests ? "active" : "")" @onclick="() => filterOnlyHotelGuests = true">
+                            🏨 Misafirlerimizin Uçağı (@FlightsWithGuestsCount)
+                        </button>
+                    </div>
+
+                    <!-- Uçuşta Olan Otel Misafirleri Hızlı Şeridi -->
+                    @if (TotalArrivingHotelGuests > 0)
+                    {
+                        <div class="hotel-guests-flight-banner">
+                            <div class="hgb-title">
+                                <span style="font-size:1.2rem">🛎️</span>
+                                <div>
+                                    <b>@TotalArrivingHotelGuests Otel Misafirimiz Bu Uçuşlarda</b>
+                                    <small>Havalimanı VIP transfer & erken oda teslimi aktif takipte</small>
+                                </div>
+                            </div>
+                            <div class="hgb-chips">
+                                @foreach (var g in inboundFlights.SelectMany(f => f.ArrivingGuests))
+                                {
+                                    <button class="hgb-chip" @onclick="() => OpenGuestFlightModal(g)" title="Uçuş ve Transfer Kartı">
+                                        <span class="chip-avatar">👤</span>
+                                        <span class="chip-name">@g.GuestName</span>
+                                        <span class="chip-room">Oda @g.RoomNumber</span>
+                                        <span class="chip-flight">@g.FlightNumber</span>
+                                        <span class="chip-eta">⏱️ @g.EstimatedHotelArrival</span>
+                                    </button>
+                                }
+                            </div>
+                        </div>
+                    }
+
+                    <!-- Uçuş Listesi -->
+                    <div class="flights-list">
+                        @{
+                            var displayFlights = filterOnlyHotelGuests 
+                                ? inboundFlights.Where(f => f.ArrivingGuests.Any()).ToList() 
+                                : inboundFlights;
+                        }
+                        @foreach (var f in displayFlights)
+                        {
+                            <div class="flight-card" @onclick="() => OpenFlightModal(f)" style="cursor:pointer" title="Uçuş ve Transfer Detayını Aç">
+                                <div class="f-flag">@f.OriginFlag</div>
+                                <div class="f-info">
+                                    <div class="f-top">
+                                        <b class="f-no">@f.FlightNumber</b>
+                                        <span class="f-route">@f.OriginCity ➔ @airportSummary?.AirportCode</span>
+                                        <span class="f-time">⏱️ @f.ArrivalTime</span>
+                                    </div>
+                                    <div class="f-bottom">
+                                        <span class="f-plane">✈️ @f.AirlineName (@f.AircraftType)</span>
+                                        <div class="f-load-bar" title="%@f.LoadFactorPercent Doluluk (@f.Capacity Yolcu)">
+                                            <div class="f-load-fill" style="width: @f.LoadFactorPercent%"></div>
+                                        </div>
+                                        <span class="f-load-txt">%@f.LoadFactorPercent</span>
+                                    </div>
+
+                                    <!-- Gelen Otel Misafirleri Kutusu -->
+                                    @if (f.ArrivingGuests.Any())
+                                    {
+                                        <div class="f-guests-section">
+                                            <div class="f-guests-header">
+                                                <span class="f-guest-badge">🏨 Bu Uçaktaki Otel Misafirleri (@f.ArrivingGuests.Count Misafir)</span>
+                                                <span class="f-guest-hint">Karşılama protokolü için tıklayın ➔</span>
+                                            </div>
+                                            <div class="f-guests-list">
+                                                @foreach (var g in f.ArrivingGuests)
+                                                {
+                                                    <div class="f-guest-pill @GetGuestVipClass(g.VipStatus)" 
+                                                         @onclick="() => OpenGuestFlightModal(g)" @onclick:stopPropagation="true" title="Uçuş ve Karşılama Kartını Aç">
+                                                        <div class="fg-left">
+                                                            <span class="fg-ico">👤</span>
+                                                            <div class="fg-meta">
+                                                                <b>@g.GuestName</b>
+                                                                <small>Oda @g.RoomNumber · @g.RoomType · <span class="fg-vip">@g.VipStatus</span></small>
+                                                            </div>
+                                                        </div>
+                                                        <div class="fg-right">
+                                                            <span class="fg-transfer">🚗 @g.TransferStatus</span>
+                                                            <span class="fg-eta">Varış: @g.EstimatedHotelArrival</span>
+                                                        </div>
+                                                    </div>
+                                                }
+                                            </div>
+                                        </div>
+                                    }
+                                </div>
+                                <div class="f-status @GetFlightCardStatusClass(f.Status)">
+                                    @f.Status
+                                </div>
+                            </div>
+                        }
+                    </div>
+                }
+            </div>
+
+            <!-- 2. SÜTUN: 14 Günlük Şehir Etkinlik Radarı -->
+            <div class="panel-box">
+                <div class="panel-head">
+                    <div class="head-left">
+                        <span class="p-ico">🎟️</span>
+                        <div>
+                            <h4>Şehir Etkinlik & Talep Radarı</h4>
+                            <small>Konserler, Kongreler, Maçlar & Festivaller</small>
+                        </div>
+                    </div>
+                    <button class="btn sm primary" @onclick="OpenAddEventModal" title="Özel etkinlik simülasyonu ekle">
+                        ➕ Etkinlik Simüle Et
+                    </button>
+                </div>
+
+                <div class="events-scroll-wrap">
+                    @foreach (var ev in cityEvents)
+                    {
+                        <div class="event-card @(ev.IsCustom ? "custom-sim" : "")">
+                            <div class="ev-top">
+                                <div class="ev-badge-row">
+                                    <span class="ev-cat-badge" style="border-color:@ev.CategoryColor;color:@ev.CategoryColor">
+                                        @ev.CategoryIcon @GetEventCategoryTitle(ev.Category)
+                                    </span>
+                                    @if (ev.IsCustom)
+                                    {
+                                        <span class="ev-sim-chip">🧪 Simülasyon</span>
+                                    }
+                                    <span class="ev-date">📅 @ev.Date.ToString("dd MMM dddd")</span>
+                                </div>
+                                <span class="ev-impact-badge" title="AI Talep Ağırlığı">⚡ +%@ev.DemandImpactScore Talep</span>
+                            </div>
+
+                            <h4 class="ev-title">@ev.Title</h4>
+
+                            <div class="ev-meta-grid">
+                                <div><span>📍 Mekan:</span> <b>@ev.Venue</b> (@ev.DistanceKm km)</div>
+                                <div><span>👥 Katılımcı:</span> <b style="color:#38bdf8">~@ev.ExpectedAttendance.ToString("N0") Kişi</b></div>
+                            </div>
+
+                            <p class="ev-desc">@ev.Description</p>
+
+                            <div class="ev-progress-row">
+                                <span class="ev-prog-label">Bilet Satış Oranı:</span>
+                                <div class="ev-prog-bar">
+                                    <div class="ev-prog-fill" style="width: @ev.TicketSoldPercent%; background: @(ev.TicketSoldPercent >= 95 ? "#ef4444" : "#10b981")"></div>
+                                </div>
+                                <b class="ev-prog-val" style="color: @(ev.TicketSoldPercent >= 95 ? "#ef4444" : "#10b981")">%@ev.TicketSoldPercent</b>
+                            </div>
+                        </div>
+                    }
+                </div>
+            </div>
+
+            <!-- 3. SÜTUN: AI Surge Pricing & OTA Senkronizasyon Konsolu -->
+            <div class="panel-box highlight-box">
+                <div class="panel-head">
+                    <div class="head-left">
+                        <span class="p-ico">⚡</span>
+                        <div>
+                            <h4>Yapay Zeka Dinamik Gelir Kokpiti</h4>
+                            <small>Fiyat Optimizasyonu & OTA Dağıtım Konsolu</small>
+                        </div>
+                    </div>
+                    <span class="panel-tag active">🚀 Otomatik Fiyatlama</span>
+                </div>
+
+                <!-- Fiyat Karşılaştırma Kutusu -->
+                <div class="surge-display-box">
+                    <div class="surge-meter-row">
+                        <div class="meter-col">
+                            <span class="meter-lbl">STANDART LİSTE ADR</span>
+                            <div class="meter-val base">@Fmt.Money(surgeAnalysis.BaseAdr)</div>
+                            <small style="color:#94a3b8">Bölge Baz Fiyatı</small>
+                        </div>
+
+                        <div class="surge-arrow-col">
+                            <div class="multiplier-chip">
+                                <span>🚀 @surgeAnalysis.SurgeMultiplier.ToString("F2")x</span>
+                            </div>
+                            <div class="arrow-svg">➔</div>
+                        </div>
+
+                        <div class="meter-col">
+                            <span class="meter-lbl">ÖNERİLEN OPTİMİZE ADR</span>
+                            <div class="meter-val surged">@Fmt.Money(surgeAnalysis.SurgedAdr)</div>
+                            <small style="color:#34d399">Hafta Sonu Optimize</small>
+                        </div>
+                    </div>
+
+                    <!-- Talep Faktörleri Dökümü -->
+                    <div class="drivers-box">
+                        <span class="drivers-title">🧠 DİNAMİK FİYATI BELİRLEYEN YAPAY ZEKA SİNYALLERİ:</span>
+                        <ul class="drivers-list">
+                            @foreach (var driver in surgeAnalysis.KeyDemandDrivers)
+                            {
+                                <li>@driver</li>
+                            }
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- 1-Tıkla OTA Senkronizasyon Konsolu -->
+                <div class="ota-sync-console">
+                    <div class="ota-console-head">
+                        <b>🌐 KÜRESEL OTA KANALLARI (7 KANAL)</b>
+                        <span class="ota-live-dot">● API Canlı</span>
+                    </div>
+
+                    <div class="ota-channels-grid">
+                        @foreach (var ch in otaChannels)
+                        {
+                            <div class="ota-card @(isSyncing ? "syncing" : "") @(isSyncedSuccess ? "synced" : "")">
+                                <div class="ota-card-left">
+                                    <span class="ota-ico">@ch.Icon</span>
+                                    <div>
+                                        <b class="ota-name">@ch.Name</b>
+                                        <small class="ota-ms">@ch.LatencyMs ms gecikme</small>
+                                    </div>
+                                </div>
+                                <div class="ota-card-right">
+                                    <b class="ota-rate">@Fmt.Money(surgeAnalysis.SurgedAdr)</b>
+                                    <span class="ota-status-pill @(isSyncedSuccess ? "ok" : "")">
+                                        @(isSyncedSuccess ? "✓ Yayında" : ch.StatusText)
+                                    </span>
+                                </div>
+                            </div>
+                        }
+                    </div>
+
+                    <!-- Büyük OTA Senkronizasyon Butonu -->
+                    <div style="margin-top:16px">
+                        @if (isSyncing)
+                        {
+                            <div class="sync-progress-wrap">
+                                <div class="sync-bar">
+                                    <div class="sync-bar-fill" style="width: @syncProgress%"></div>
+                                </div>
+                                <div class="sync-status-txt">
+                                    <span>📡 OTA API Handshake Yapılıyor (@syncProgress%)...</span>
+                                    <span>Lütfen bekleyin</span>
+                                </div>
+                            </div>
+                        }
+                        else
+                        {
+                            <button class="btn-push-ota @(isSyncedSuccess ? "success" : "")" @onclick="PushSurgeToOtaAsync" id="btnPushOtaRates">
+                                @if (isSyncedSuccess)
+                                {
+                                    <span>✅ DİNAMİK FİYATLAR TÜM KANALLARA YAYINLANDI (7/7 OTA)</span>
+                                }
+                                else
+                                {
+                                    <span>⚡ TÜM KANALLARA YENİ DİNAMİK FİYATLARI GÖNDER (@Fmt.Money(surgeAnalysis.SurgedAdr))</span>
+                                }
+                            </button>
+                        }
+
+                        @if (syncSuccessNotice != null)
+                        {
+                            <div class="sync-success-notice">
+                                @syncSuccessNotice
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Canlı Senaryo Simülasyon Laboratuvarı -->
+        <div class="simulation-lab-card">
+            <div class="lab-head">
+                <div style="display:flex;align-items:center;gap:10px">
+                    <span style="font-size:1.6rem">🧪</span>
+                    <div>
+                        <h3 style="margin:0;color:#fff">Etkileşimli "Ya Olursa?" (Senaryo) Talep Simülasyon Laboratuvarı</h3>
+                        <small style="color:#94a3b8">Sürgüleri hareket ettirerek uçak doluluğu veya katılımcı patlamasının fiyat eğrisine etkisini anında test edin.</small>
+                    </div>
+                </div>
+                <button class="btn sm" @onclick="ResetSimulation">🔄 Sıfırla</button>
+            </div>
+
+            <div class="lab-sliders-grid">
+                <div class="slider-box">
+                    <div class="slider-head">
+                        <span>✈️ Ekstra Uçuş Doluluk Artışı</span>
+                        <b style="color:#38bdf8">+%@simFlightBoost</b>
+                    </div>
+                    <input type="range" min="0" max="25" step="1" value="@simFlightBoost" @oninput="OnFlightBoostChange" class="custom-range" />
+                    <small class="slider-hint">Dış hat uçak biletlerinin dolması durumunda son dakika seyahat talebi çarpanı.</small>
+                </div>
+
+                <div class="slider-box">
+                    <div class="slider-head">
+                        <span>🎟️ Ekstra Şehir Katılımcı Hacmi</span>
+                        <b style="color:#ec4899">+@simAttendanceBoost.ToString("N0") Kişi</b>
+                    </div>
+                    <input type="range" min="0" max="50000" step="2500" value="@simAttendanceBoost" @oninput="OnAttendanceBoostChange" class="custom-range" />
+                    <small class="slider-hint">Şehre beklenmedik büyük bir etkinlik veya kongre gelmesi durumunda talep baskısı.</small>
+                </div>
+
+                <div class="slider-box">
+                    <div class="slider-head">
+                        <span>☀️ Ani Isı Dalgası / Sıcaklık</span>
+                        <b style="color:#fbbf24">+@simTempBoost°C</b>
+                    </div>
+                    <input type="range" min="0" max="8" step="1" value="@simTempBoost" @oninput="OnTempBoostChange" class="custom-range" />
+                    <small class="slider-hint">Bölgede sıcaklığın artmasıyla tetiklenen ani hafta sonu kaçamakları.</small>
+                </div>
+            </div>
+        </div>
+    }
+
+    <!-- ================= ÖZEL ETKİNLİK SİMÜLASYONU MODALI ================= -->
+    @if (showAddEventModal && selectedHotel != null)
+    {
+        <div class="custom-modal-backdrop" @onclick="() => showAddEventModal = false">
+            <div class="custom-modal-card" @onclick:stopPropagation="true" style="max-width:540px">
+                <div class="modal-head">
+                    <div style="display:flex;align-items:center;gap:10px">
+                        <span style="font-size:1.4rem">✨</span>
+                        <div>
+                            <h3 style="margin:0;color:#fff">Özel Etkinlik Simülasyonu Tanımla</h3>
+                            <small style="color:#94a3b8">@selectedHotel.City için VIP düğün, kongre veya festival ekleyin</small>
+                        </div>
+                    </div>
+                    <button class="modal-close-btn" @onclick="() => showAddEventModal = false">✕</button>
+                </div>
+
+                <div class="modal-body">
+                    <label class="f-label">Etkinlik Adı *</label>
+                    <input type="text" class="custom-select" style="width:100%" placeholder="Örn: 3 Günlük Lüks Hint Düğünü & VIP Konuklar" @bind="newEventTitle" />
+
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px">
+                        <div>
+                            <label class="f-label">Kategori</label>
+                            <select class="custom-select" style="width:100%" @bind="newEventCategory">
+                                <option value="Concert">🎵 Konser & Müzik</option>
+                                <option value="Festival">🎉 VIP Düğün & Kutlama</option>
+                                <option value="Congress">🤝 Uluslararası Zirve</option>
+                                <option value="Sports">⚽ Spor Müsabakası</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="f-label">Beklenen Katılımcı</label>
+                            <input type="number" class="custom-select" style="width:100%" @bind="newEventAttendance" />
+                        </div>
+                    </div>
+
+                    <div style="margin-top:12px">
+                        <label class="f-label">Talep Ağırlık Skoru (1 - 100): <b style="color:#38bdf8">%@newEventImpact</b></label>
+                        <input type="range" min="30" max="100" @bind="newEventImpact" class="custom-range" style="width:100%" />
+                    </div>
+
+                    <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:20px">
+                        <button class="btn" @onclick="() => showAddEventModal = false">İptal</button>
+                        <button class="btn primary" @onclick="SubmitCustomEvent">✓ Simülasyona Ekle & Fiyatı Güncelle</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+
+    <!-- ================= MİSAFİR UÇUŞ & VIP KARŞILAMA MODALI ================= -->
+    @if (showGuestFlightModal && modalFlight != null)
+    {
+        <div class="custom-modal-backdrop" @onclick="() => showGuestFlightModal = false">
+            <div class="custom-modal-card" @onclick:stopPropagation="true" style="max-width:880px">
+                <div class="modal-head">
+                    <div style="display:flex;align-items:center;gap:12px">
+                        <span style="font-size:1.8rem">🛫</span>
+                        <div>
+                            <h3 style="margin:0;color:#fff">Uçuş Telemetrisi & VIP Havalimanı Karşılama Konsolu</h3>
+                            <small style="color:#94a3b8">@modalFlight.AirlineName · Sefer No: @modalFlight.FlightNumber · Tescil: @modalFlight.TailNumber</small>
+                        </div>
+                    </div>
+                    <button class="modal-close-btn" @onclick="() => showGuestFlightModal = false">✕</button>
+                </div>
+
+                <div class="modal-body">
+                    <div class="modal-2col-grid">
+                        <!-- SOL SÜTUN: UÇUŞ & ATC DOSYASI -->
+                        <div>
+                            <!-- Uçuş Rota Kartı -->
+                            <div class="flight-telemetry-box" style="margin-bottom:12px">
+                                <div class="flight-route-hero">
+                                    <div class="route-point">
+                                        <div class="rp-flag">@modalFlight.OriginFlag</div>
+                                        <div class="rp-city">@modalFlight.OriginCity</div>
+                                        <div class="rp-sub">@modalFlight.OriginCountry</div>
+                                    </div>
+
+                                    <div class="route-plane-anim">
+                                        <span class="rpa-plane">✈️</span>
+                                        <span class="rpa-no">@modalFlight.FlightNumber</span>
+                                        <span class="rpa-time">⏱️ İniş: @modalFlight.ArrivalTime</span>
+                                    </div>
+
+                                    <div class="route-point">
+                                        <div class="rp-flag">🛬</div>
+                                        <div class="rp-city">@airportSummary?.AirportCode</div>
+                                        <div class="rp-sub">@airportSummary?.AirportName</div>
+                                    </div>
+                                </div>
+
+                                <div style="display:flex;justify-content:space-between;align-items:center;font-size:0.75rem;padding-top:4px">
+                                    <span style="color:#cbd5e1">📡 Uçuş Durumu:</span>
+                                    <span class="f-status @GetFlightCardStatusClass(modalFlight.Status)">
+                                        @modalFlight.StatusDetail
+                                    </span>
+                                </div>
+                            </div>
+
+                            <!-- Teknik Telemetri & Squawk Kutusu -->
+                            <div class="card" style="background:rgba(15,23,42,0.6);border:1px solid rgba(255,255,255,0.08);padding:14px;margin-bottom:12px">
+                                <div style="font-size:0.72rem;font-weight:800;color:#38bdf8;margin-bottom:8px;letter-spacing:0.5px">
+                                    📊 CANLI ADS-B & ATC BİLGİLERİ
+                                </div>
+                                <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:0.74rem">
+                                    <div><span style="color:#94a3b8">Uçak Modeli:</span> <b style="color:#fff;display:block">@modalFlight.AircraftType</b></div>
+                                    <div><span style="color:#94a3b8">Kuyruk Tescil:</span> <b style="color:#fbbf24;display:block">@modalFlight.TailNumber</b></div>
+                                    <div><span style="color:#94a3b8">İrtifa:</span> <b style="color:#fff;display:block">@modalFlight.AltitudeFt.ToString("N0") FT</b></div>
+                                    <div><span style="color:#94a3b8">Yer Hızı:</span> <b style="color:#fff;display:block">@modalFlight.SpeedKnots KT</b></div>
+                                    <div><span style="color:#94a3b8">Tahsis Edilen Pist:</span> <b style="color:#34d399;display:block">@modalFlight.Runway</b></div>
+                                    <div><span style="color:#94a3b8">Körük / Kapı:</span> <b style="color:#38bdf8;display:block">@modalFlight.Gate</b></div>
+                                    <div><span style="color:#94a3b8">Bagaj Bandı:</span> <b style="color:#fff;display:block">@modalFlight.BaggageBelt</b></div>
+                                    <div><span style="color:#94a3b8">Yolcu Doluluk:</span> <b style="color:#34d399;display:block">%@modalFlight.LoadFactorPercent (@modalFlight.Capacity Yolcu)</b></div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- SAĞ SÜTUN: OTEL MİSAFİRİ & VIP TRANSFER PROTOKOLÜ -->
+                        <div>
+                            @if (modalFlight.ArrivingGuests.Any())
+                            {
+                                @if (modalFlight.ArrivingGuests.Count > 1)
+                                {
+                                    <div style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap">
+                                        @foreach (var g in modalFlight.ArrivingGuests)
+                                        {
+                                            <button class="f-filter-btn @(selectedGuestFlight == g ? "active" : "")" 
+                                                    style="flex:initial;padding:4px 8px;font-size:0.7rem" 
+                                                    @onclick="() => selectedGuestFlight = g">
+                                                👤 @g.GuestName (Oda @g.RoomNumber)
+                                            </button>
+                                        }
+                                    </div>
+                                }
+
+                                @if (selectedGuestFlight != null)
+                                {
+                                    <!-- Misafir & Oda Bilgisi -->
+                                    <div class="card" style="background:rgba(30,41,59,0.5);border:1px solid rgba(255,255,255,0.08);margin-bottom:12px;padding:12px">
+                                        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px">
+                                            <div>
+                                                <h4 style="margin:0;color:#fff;font-size:1.05rem">👤 @selectedGuestFlight.GuestName</h4>
+                                                <span class="badge b-ok" style="font-size:0.7rem;margin-top:4px">👑 @selectedGuestFlight.VipStatus</span>
+                                            </div>
+                                            <div style="text-align:right">
+                                                <span style="font-size:0.7rem;color:#94a3b8">Tahsis Edilen Oda</span>
+                                                <div style="font-size:1.15rem;font-weight:800;color:#38bdf8">Oda @selectedGuestFlight.RoomNumber</div>
+                                                <small style="color:#cbd5e1">@selectedGuestFlight.RoomType</small>
+                                            </div>
+                                        </div>
+                                        <div style="font-size:0.72rem;color:#94a3b8;display:flex;gap:12px;border-top:1px solid rgba(255,255,255,0.06);padding-top:6px;margin-bottom:6px">
+                                            <span>📱 Tel: <b style="color:#fff">@selectedGuestFlight.Phone</b></span>
+                                            <span>📋 Rez: <b style="color:#fff">@selectedGuestFlight.ReservationCode</b></span>
+                                        </div>
+                                        <div style="font-size:0.72rem;background:rgba(15,23,42,0.6);padding:6px 8px;border-radius:6px;color:#cbd5e1">
+                                            <div>Oda Durumu: <b style="color:#34d399">@selectedGuestFlight.RoomReadiness</b></div>
+                                            <div style="margin-top:2px">İkram & İstek: <b style="color:#fbbf24">@selectedGuestFlight.SpecialWishes</b></div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Karşılama Şoförü & Araç -->
+                                    <div class="transfer-driver-card" style="margin-bottom:12px;padding:12px">
+                                        <div class="td-head">
+                                            <span>🚗 VIP HAVALİMANI KARŞILAMA PROTOKOLÜ</span>
+                                            <span class="badge b-ok" style="font-size:0.65rem">Aktif Görev</span>
+                                        </div>
+                                        <div class="td-grid">
+                                            <div>
+                                                <span>Karşılama Durumu:</span>
+                                                <b style="color:#38bdf8;display:block">@selectedGuestFlight.TransferStatus</b>
+                                            </div>
+                                            <div>
+                                                <span>Tahmini Otele Varış (ETA):</span>
+                                                <b style="color:#34d399;display:block">⏱️ @selectedGuestFlight.EstimatedHotelArrival</b>
+                                            </div>
+                                            <div>
+                                                <span>Karşılama Kapısı:</span>
+                                                <b style="color:#fff;display:block">🚪 @selectedGuestFlight.TerminalGate</b>
+                                            </div>
+                                            <div>
+                                                <span>Bagaj Durumu:</span>
+                                                <b style="color:#34d399;display:block">🧳 @selectedGuestFlight.BaggageStatus</b>
+                                            </div>
+                                            <div style="grid-column:1 / -1;border-top:1px solid rgba(255,255,255,0.06);padding-top:6px">
+                                                <span>Görevli Şoför & Araç:</span>
+                                                <b style="color:#fbbf24;display:block">👤 @selectedGuestFlight.DriverInfo · @selectedGuestFlight.VehicleModel (@selectedGuestFlight.VehiclePlate)</b>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Şoförün Havalimanı Karşılama Tableti Önizlemesi (Chauffeur Tablet Sign Preview) -->
+                                    <div class="pickup-tablet-preview">
+                                        <div class="ptp-header">VIP GUEST PROTOCOL · OTELPRO</div>
+                                        <div class="ptp-hotel">🏨 @selectedHotel?.Name.ToUpperInvariant()</div>
+                                        <div class="ptp-name">@selectedGuestFlight.PickupSignText</div>
+                                        <div class="ptp-welcome">HOŞ GELDİNİZ · WELCOME</div>
+                                        <div class="ptp-footer-badge">
+                                            <span>🚗 @selectedGuestFlight.VehiclePlate</span>
+                                            <span>•</span>
+                                            <span>🚪 @selectedGuestFlight.TerminalGate</span>
+                                        </div>
+                                    </div>
+                                }
+                            }
+                            else
+                            {
+                                <div style="background:rgba(15,23,42,0.6);border:1px solid rgba(255,255,255,0.08);border-radius:12px;padding:24px;text-align:center;color:#94a3b8">
+                                    <div style="font-size:2.2rem;margin-bottom:8px">ℹ️</div>
+                                    <h4 style="color:#fff;margin:0 0 6px">Kayıtlı Misafir Bulunmuyor</h4>
+                                    <p style="font-size:0.78rem;line-height:1.5;margin:0 0 14px">
+                                        Bu uçuşta şu an için otelimize rezervasyonu olan misafir tespit edilmedi. Uçuşun getirdiği @modalFlight.Capacity yolcu potansiyeli otelinizin dinamik talep katsayısına otomatik yansıtılmıştır.
+                                    </p>
+                                    <button class="btn sm primary" @onclick="CreateManualTransferAlert">
+                                        ➕ Bu Uçuşa Manuel Karşılama / Transfer Ekle
+                                    </button>
+                                </div>
+                            }
+
+                            <!-- Canlı Aksiyon Bildirim Toast'u -->
+                            @if (guestActionToast != null)
+                            {
+                                <div class="action-toast-banner">
+                                    @guestActionToast
+                                </div>
+                            }
+
+                            <!-- Hızlı Operasyonel Aksiyonlar -->
+                            @if (selectedGuestFlight != null)
+                            {
+                                <div class="action-buttons-row">
+                                    <button class="btn-flight-action call" @onclick="TriggerDriverCall">
+                                        <span>📞</span> Şoförü Ara
+                                    </button>
+                                    <button class="btn-flight-action" @onclick="SendWelcomeSms">
+                                        <span>📱</span> Karşılama SMS'i
+                                    </button>
+                                    <button class="btn-flight-action" @onclick="NotifyFrontDeskEarlyCheckin">
+                                        <span>🛎️</span> Erken Check-in
+                                    </button>
+                                    <button class="btn-flight-action" @onclick="SendDigitalKey">
+                                        <span>🚪</span> Dijital Anahtar
+                                    </button>
+                                    <button class="btn-flight-action" @onclick="PrintPickupSign">
+                                        <span>🖨️</span> Pankart Yazdır
+                                    </button>
+                                </div>
+                            }
+                        </div>
+                    </div>
+
+                    <div style="display:flex;justify-content:flex-end;margin-top:16px;border-top:1px solid rgba(255,255,255,0.08);padding-top:12px">
+                        <button class="btn" @onclick="() => showGuestFlightModal = false">Pencereyi Kapat</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    List<Hotel> hotels = new();
+    int selectedHotelId = 1;
+    Hotel? selectedHotel;
+
+    AirportInflowSummary? airportSummary;
+    List<FlightInboundInfo> inboundFlights = new();
+    List<CityRadarEvent> cityEvents = new();
+    WeatherTourismImpact? weatherImpact;
+    YieldSurgeAnalysis? surgeAnalysis;
+    List<OtaSyncChannel> otaChannels = new();
+
+    // Radar View Modes & HUD Target Lock
+    bool isRadarViewMode = true;
+    bool isRadarSweepPaused = false;
+    FlightInboundInfo? selectedFlightForHud;
+    FlightInboundInfo? modalFlight;
+
+    // Flight Guest Filter & Modal
+    bool filterOnlyHotelGuests = false;
+    bool showGuestFlightModal = false;
+    ArrivingGuestFlightInfo? selectedGuestFlight;
+    string? guestActionToast;
+
+    int TotalArrivingHotelGuests => inboundFlights.Sum(f => f.ArrivingGuests.Count);
+    int FlightsWithGuestsCount => inboundFlights.Count(f => f.ArrivingGuests.Any());
+
+    // Lab Sliders
+    int simFlightBoost = 0;
+    int simAttendanceBoost = 0;
+    int simTempBoost = 0;
+
+    // Custom Event Modal
+    bool showAddEventModal = false;
+    string newEventTitle = "";
+    string newEventCategory = "Festival";
+    int newEventAttendance = 1200;
+    int newEventImpact = 90;
+
+    // Sync state
+    bool isSyncing = false;
+    int syncProgress = 0;
+    bool isSyncedSuccess = false;
+    string? syncSuccessNotice = null;
+
+    int TotalExpectedAttendance => cityEvents.Sum(e => e.ExpectedAttendance) + simAttendanceBoost;
+
+    string GetBlipStyle(FlightInboundInfo f) => $"top:{f.RadarY:F1}%; left:{f.RadarX:F1}%;";
+    string GetPlaneRotation(FlightInboundInfo f) => $"transform: rotate({f.HeadingDeg}deg);";
+    string GetFlightCardStatusClass(string status) => status == "İndi" ? "landed" : status == "Özel Jet" ? "vip" : "approaching";
+    string GetGuestVipClass(string vipStatus) => vipStatus.Contains("Ultra") ? "ultra-vip" : vipStatus.Contains("VIP") ? "vip" : "";
+
+    void ToggleSweepPause()
+    {
+        isRadarSweepPaused = !isRadarSweepPaused;
+    }
+
+    void SelectFlightForHud(FlightInboundInfo f)
+    {
+        selectedFlightForHud = f;
+    }
+
+    void OpenFlightModal(FlightInboundInfo f)
+    {
+        modalFlight = f;
+        selectedGuestFlight = f.ArrivingGuests.FirstOrDefault();
+        guestActionToast = null;
+        showGuestFlightModal = true;
+    }
+
+    void OpenGuestFlightModal(ArrivingGuestFlightInfo g)
+    {
+        selectedGuestFlight = g;
+        modalFlight = inboundFlights.FirstOrDefault(f => f.ArrivingGuests.Contains(g)) ?? inboundFlights.FirstOrDefault();
+        guestActionToast = null;
+        showGuestFlightModal = true;
+    }
+
+    void TriggerDriverCall()
+    {
+        if (selectedGuestFlight == null) return;
+        guestActionToast = $"📞 {selectedGuestFlight.DriverInfo} aranıyor (+90 532 500 40 30)... Şoför hatta: '{selectedGuestFlight.VehiclePlate}' plakalı araç ile {selectedGuestFlight.TerminalGate} noktasında misafiri bekliyor.";
+    }
+
+    void SendWelcomeSms()
+    {
+        if (selectedGuestFlight == null) return;
+        guestActionToast = $"📱 '{selectedGuestFlight.GuestName}' misafirine SMS/WhatsApp iletildi: 'Sayın misafirimiz, {selectedGuestFlight.FlightNumber} seferiniz iniş yapmıştır. VIP transfer aracınız {selectedGuestFlight.TerminalGate} noktasında sizi beklemektedir.'";
+    }
+
+    void NotifyFrontDeskEarlyCheckin()
+    {
+        if (selectedGuestFlight == null) return;
+        guestActionToast = $"🛎️ Resepsiyon ve Kat Hizmetleri uyarıldı: Oda {selectedGuestFlight.RoomNumber} erken giriş için VIP ikram tabağı ile hazırlandı.";
+    }
+
+    void SendDigitalKey()
+    {
+        if (selectedGuestFlight == null) return;
+        guestActionToast = $"🚪 Oda {selectedGuestFlight.RoomNumber} mobil Bluetooth kapı anahtarı {selectedGuestFlight.Phone} numaralı telefona teslim edildi.";
+    }
+
+    void PrintPickupSign()
+    {
+        if (selectedGuestFlight == null) return;
+        guestActionToast = $"🖨️ Karşılama pankartı '{selectedGuestFlight.PickupSignText}' şoför tabletine ve havalimanı termal yazıcısına iletildi.";
+    }
+
+    void CreateManualTransferAlert()
+    {
+        guestActionToast = $"🛎️ {modalFlight?.FlightNumber} seferi için ön büro transfer ekibine manuel karşılama ve araç tahsis görevi açıldı.";
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        hotels = await YieldService.GetHotelsAsync();
+        if (hotels.Any())
+        {
+            selectedHotelId = hotels.First().Id;
+            await LoadHotelDataAsync();
+        }
+    }
+
+    async Task OnHotelChanged(ChangeEventArgs e)
+    {
+        if (int.TryParse(e.Value?.ToString(), out var newId))
+        {
+            selectedHotelId = newId;
+            isSyncedSuccess = false;
+            syncSuccessNotice = null;
+            await LoadHotelDataAsync();
+        }
+    }
+
+    Task LoadHotelDataAsync()
+    {
+        selectedHotel = hotels.FirstOrDefault(h => h.Id == selectedHotelId) ?? hotels.FirstOrDefault();
+        if (selectedHotel == null) return Task.CompletedTask;
+
+        airportSummary = YieldService.GetAirportInflow(selectedHotel);
+        inboundFlights = YieldService.GetArrivingFlights(selectedHotel);
+        cityEvents = YieldService.GetCityEvents(selectedHotel);
+        weatherImpact = YieldService.GetWeatherImpact(selectedHotel);
+
+        selectedFlightForHud = inboundFlights.FirstOrDefault(f => f.ArrivingGuests.Any()) ?? inboundFlights.FirstOrDefault();
+
+        RecalculateSurge();
+        return Task.CompletedTask;
+    }
+
+    void RecalculateSurge()
+    {
+        if (selectedHotel == null) return;
+        surgeAnalysis = YieldService.CalculateSurge(selectedHotel, simFlightBoost, simAttendanceBoost, simTempBoost);
+        otaChannels = YieldService.GetOtaChannels(surgeAnalysis.BaseAdr, surgeAnalysis.SurgedAdr);
+    }
+
+    void OnFlightBoostChange(ChangeEventArgs e)
+    {
+        if (int.TryParse(e.Value?.ToString(), out var val))
+        {
+            simFlightBoost = val;
+            RecalculateSurge();
+        }
+    }
+
+    void OnAttendanceBoostChange(ChangeEventArgs e)
+    {
+        if (int.TryParse(e.Value?.ToString(), out var val))
+        {
+            simAttendanceBoost = val;
+            RecalculateSurge();
+        }
+    }
+
+    void OnTempBoostChange(ChangeEventArgs e)
+    {
+        if (int.TryParse(e.Value?.ToString(), out var val))
+        {
+            simTempBoost = val;
+            RecalculateSurge();
+        }
+    }
+
+    void ResetSimulation()
+    {
+        simFlightBoost = 0;
+        simAttendanceBoost = 0;
+        simTempBoost = 0;
+        YieldService.ClearCustomEvents();
+        if (selectedHotel != null)
+        {
+            cityEvents = YieldService.GetCityEvents(selectedHotel);
+        }
+        RecalculateSurge();
+    }
+
+    void OpenAddEventModal()
+    {
+        newEventTitle = "VIP Lüks Düğün & İş Zirvesi";
+        newEventCategory = "Festival";
+        newEventAttendance = 1500;
+        newEventImpact = 92;
+        showAddEventModal = true;
+    }
+
+    void SubmitCustomEvent()
+    {
+        if (selectedHotel == null || string.IsNullOrWhiteSpace(newEventTitle)) return;
+
+        YieldService.AddCustomSimulatedEvent(selectedHotel, newEventTitle, newEventCategory, newEventAttendance, newEventImpact);
+        cityEvents = YieldService.GetCityEvents(selectedHotel);
+        showAddEventModal = false;
+        RecalculateSurge();
+    }
+
+    async Task PushSurgeToOtaAsync()
+    {
+        if (surgeAnalysis == null || selectedHotel == null) return;
+        isSyncing = true;
+        syncProgress = 15;
+        StateHasChanged();
+
+        await Task.Delay(200);
+        syncProgress = 45;
+        StateHasChanged();
+
+        await Task.Delay(250);
+        syncProgress = 75;
+        StateHasChanged();
+
+        await Task.Delay(200);
+        syncProgress = 100;
+        isSyncing = false;
+        isSyncedSuccess = true;
+        syncSuccessNotice = $"✅ {DateTime.Now:HH:mm:ss} itibarıyla {Fmt.Money(surgeAnalysis.SurgedAdr)} surge fiyatı Booking.com, Airbnb, Expedia, Agoda, ETS Tur ve Google Hotels kanallarına başarıyla yayınlandı!";
+        StateHasChanged();
+
+        // Synth audio chime
+        try
+        {
+            await JS.InvokeVoidAsync("eval", @"
+                try {
+                    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+                    const osc = ctx.createOscillator();
+                    const gain = ctx.createGain();
+                    osc.connect(gain);
+                    gain.connect(ctx.destination);
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(587.33, ctx.currentTime);
+                    osc.frequency.exponentialRampToValueAtTime(880, ctx.currentTime + 0.15);
+                    gain.gain.setValueAtTime(0.15, ctx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.35);
+                    osc.start();
+                    osc.stop(ctx.currentTime + 0.35);
+                } catch(e) {}
+            ");
+        }
+        catch { }
+    }
+
+    string GetEventCategoryTitle(string cat) => cat switch
+    {
+        "Concert" => "Konser & Müzik",
+        "Festival" => "Festival & Kültür",
+        "Sports" => "Spor & Turnuva",
+        "Congress" => "Kongre & Zirve",
+        _ => cat
+    };
+}
+

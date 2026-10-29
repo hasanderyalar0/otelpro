@@ -1,0 +1,1845 @@
+@page "/mobile"
+@layout Otel.Web.Components.Layout.PublicLayout
+@inject AppDb Db
+@inject BookingService Booking
+@inject ReportService Reports
+@inject HotelState CurrentHotelState
+@inject IJSRuntime JS
+@inject NavigationManager Nav
+@inject MachineLearningEngine Ml
+@inject AiIntelligenceService Ai
+@inject AiCopilotService Copilot
+
+<div class="mobile-simulator-wrapper">
+    <!-- Masaüstü Simülatör Kontrol Çubuğu -->
+    <div class="sim-toolbar">
+        <div class="sim-brand">
+            <span style="font-size:1.5rem">📱</span>
+            <div>
+                <b style="color:#fff;font-size:0.95rem">OtelPro Mobil</b>
+                <span class="badge-tag">PATRON & YÖNETİCİ KOKPİTİ</span>
+            </div>
+        </div>
+
+        <div class="sim-actions">
+            <!-- Otel Değiştirici -->
+            <select class="active-hotel-select" style="max-width:230px" value="@selectedHotelId" @onchange="OnHotelChanged">
+                @foreach (var h in hotels)
+                {
+                    <option value="@h.Id">🏢 @h.Name (@h.City)</option>
+                }
+            </select>
+
+            <button class="sim-toggle-btn @(isFullScreenMode ? "" : "active")" @onclick="() => isFullScreenMode = false">
+                📱 iPhone 16 Pro Modu
+            </button>
+            <button class="sim-toggle-btn @(isFullScreenMode ? "active" : "")" @onclick="() => isFullScreenMode = true">
+                💻 Geniş Ekran Modu
+            </button>
+            <button class="sim-toggle-btn" @onclick="() => showPwaGuideModal = true" title="Telefona Nasıl Yüklenir?">
+                📲 Telefona Yükle (PWA)
+            </button>
+            <a class="sim-toggle-btn" href="/guest-key" target="_blank" style="background:rgba(236,72,153,0.2);border-color:#ec4899;color:#fff">
+                📱 Misafir Dijital Anahtarı ↗
+            </a>
+            <a class="sim-toggle-btn" href="/" style="background:rgba(14,165,233,0.2);border-color:#38bdf8;color:#fff">
+                🖥️ Web Paneline Dön
+            </a>
+        </div>
+    </div>
+
+    <!-- Telefon Cihaz Çerçevesi (iPhone 16 Pro Mockup) -->
+    <div class="phone-device-frame @(isFullScreenMode ? "full-screen-mode" : "")">
+        <!-- iOS Status Bar & Dynamic Island -->
+        <div class="phone-status-bar">
+            <div class="phone-time">@DateTime.Now.ToString("HH:mm")</div>
+            <div class="dynamic-island">
+                <div class="island-camera"></div>
+                <div class="island-sensor"></div>
+            </div>
+            <div class="phone-status-icons">
+                <span>5G</span>
+                <span>📶</span>
+                <span>🔋 98%</span>
+            </div>
+        </div>
+
+        <!-- Telefon Ekran İçeriği -->
+        <div class="phone-screen-content">
+            <!-- Üst Başlık & Otel Rozeti -->
+            <div class="mobile-app-header">
+                <div class="mobile-hotel-picker-btn" @onclick="() => showHotelPickerSheet = true">
+                    <span style="font-size:1rem">🏢</span>
+                    <span class="hotel-name">@(currentHotel?.Name ?? "Tesis Seçiniz")</span>
+                    <span class="chevron">▼</span>
+                </div>
+                <div class="mobile-head-actions">
+                    <button class="mobile-icon-btn @(currentTab == "sales" ? "active-head-btn" : "")" @onclick='() => currentTab = "sales"' title="Fiyat & Kanallar (Satış)">
+                        🌐
+                    </button>
+                    <button class="mobile-icon-btn" @onclick='() => currentTab = "notifications"' title="Bildirimler">
+                        🔔
+                        @if (unreadNotificationsCount > 0)
+                        {
+                            <span class="badge-dot"></span>
+                        }
+                    </button>
+                    <a class="mobile-icon-btn" href="/book?hotelId=@selectedHotelId" target="_blank" title="Rezervasyon Sayfası">
+                        🛎️
+                    </a>
+                </div>
+            </div>
+
+            @if (loading)
+            {
+                <div style="text-align:center;padding:40px;color:var(--m-muted)">
+                    <div style="font-size:2rem;margin-bottom:8px">⏳</div>
+                    <div>Veriler yükleniyor...</div>
+                </div>
+            }
+            else
+            {
+                <!-- TAB 1: ÖZET / PATRON KOKPİTİ -->
+                @if (currentTab == "dash")
+                {
+                    <!-- Günün Özeti Banner -->
+                    <div class="mobile-summary-banner">
+                        <div class="banner-top">
+                            <div>
+                                <span class="banner-kicker">GÜNÜN ÖZETİ · @DateTime.Today.ToString("dd MMMM", L.Culture)</span>
+                                <h2 class="banner-title">@(currentHotel?.City) Tesisi</h2>
+                            </div>
+                            <div class="live-indicator">
+                                <span class="live-indicator-dot"></span>
+                                CANLI
+                            </div>
+                        </div>
+
+                        <div class="banner-metrics-row">
+                            <!-- Doluluk Çemberi -->
+                            <div class="occ-circle-wrap">
+                                <svg width="72" height="72" viewBox="0 0 72 72">
+                                    <circle cx="36" cy="36" r="30" stroke="rgba(255,255,255,0.12)" stroke-width="7" fill="none" />
+                                    <circle cx="36" cy="36" r="30" stroke="#38bdf8" stroke-width="7" fill="none"
+                                            stroke-dasharray="188.4"
+                                            stroke-dashoffset="@(188.4 - (188.4 * (occupancyPct / 100.0)))"
+                                            stroke-linecap="round" />
+                                </svg>
+                                <span class="occ-circle-val">%@occupancyPct.ToString("0")</span>
+                            </div>
+
+                            <div class="metrics-text-col">
+                                <div class="metrics-revenue-big">@Fmt.Money(todayRevenue)</div>
+                                <div class="metrics-sub">
+                                    Bugünkü Ciro · ADR: <b>@Fmt.Money(adr)</b>
+                                </div>
+                                <div class="metrics-sub" style="color:#34d399;font-weight:600">
+                                    🟢 @inHouseRooms / @totalRooms Oda Dolu (@(totalRooms - inHouseRooms) Müsait)
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 2'li Flash Kartlar -->
+                    <div class="mobile-grid-2">
+                        <div class="mobile-stat-card" @onclick='() => currentTab = "frontdesk"'>
+                            <div class="card-header-icon">
+                                <span class="card-icon">🛬</span>
+                                <span class="badge b-info">Girişler</span>
+                            </div>
+                            <div>
+                                <div class="card-label">Bugün Gelecek</div>
+                                <div class="card-val" style="color:#38bdf8">@todayArrivalsCount</div>
+                                <div class="card-foot" style="color:#94a3b8">Misafir Bekleniyor</div>
+                            </div>
+                        </div>
+
+                        <div class="mobile-stat-card" @onclick='() => currentTab = "frontdesk"'>
+                            <div class="card-header-icon">
+                                <span class="card-icon">🛫</span>
+                                <span class="badge b-warn">Çıkışlar</span>
+                            </div>
+                            <div>
+                                <div class="card-label">Bugün Ayrılacak</div>
+                                <div class="card-val" style="color:#f59e0b">@todayDeparturesCount</div>
+                                <div class="card-foot" style="color:#94a3b8">Check-out Listesi</div>
+                            </div>
+                        </div>
+
+                        <div class="mobile-stat-card" @onclick='() => currentTab = "rooms"'>
+                            <div class="card-header-icon">
+                                <span class="card-icon">🧹</span>
+                                <span class="badge @(dirtyRoomsCount > 0 ? "b-bad" : "b-ok")">Temizlik</span>
+                            </div>
+                            <div>
+                                <div class="card-label">Kirli Odalar</div>
+                                <div class="card-val" style="color:@(dirtyRoomsCount > 0 ? "#f43f5e" : "#34d399")">@dirtyRoomsCount</div>
+                                <div class="card-foot" style="color:#94a3b8">@cleanRoomsCount Temiz Hazır</div>
+                            </div>
+                        </div>
+
+                        <div class="mobile-stat-card" @onclick='() => currentTab = "sales"'>
+                            <div class="card-header-icon">
+                                <span class="card-icon">💵</span>
+                                <span class="badge b-ok">Kasa</span>
+                            </div>
+                            <div>
+                                <div class="card-label">Ön Büro Kasası</div>
+                                <div class="card-val" style="color:#34d399;font-size:1.15rem">@Fmt.Money(cashBalance)</div>
+                                <div class="card-foot" style="color:#94a3b8">Nakit & Pos Girişi</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- AI Akıllı Karar & Öngörü Kartı (Mobil) -->
+                    <div class="mobile-summary-banner" style="margin-top:12px;background:linear-gradient(135deg, rgba(14, 165, 233, 0.16), rgba(99, 102, 241, 0.16));border:1px solid rgba(56,189,248,0.4);padding:14px">
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+                            <div style="display:flex;align-items:center;gap:8px">
+                                <span style="font-size:1.3rem">🧠</span>
+                                <b style="font-size:0.9rem;color:#fff">OtelPro AI Karar Asistanı</b>
+                            </div>
+                            <span class="badge b-ok" style="font-size:0.68rem">%@Ml.ModelAccuracy ML.NET</span>
+                        </div>
+                        <p style="font-size:0.8rem;color:#cbd5e1;margin:0 0 10px 0;line-height:1.4">
+                            Hafta sonu doluluk beklentisi: <b style="color:#38bdf8">%@avgWeekendOcc</b> · <b>@highRiskCancelCount riskli iptal</b> tespit edildi.
+                        </p>
+                        <div style="display:flex;gap:6px">
+                            <button class="btn primary sm" style="font-size:0.75rem;padding:6px 10px;flex:1" @onclick="OpenAiAssistantFromFab">
+                                💬 Asistana Danış
+                            </button>
+                            <button class="btn sm" style="font-size:0.75rem;padding:6px 10px" @onclick="TrainModelFromMobile" disabled="@isTrainingMobile">
+                                🔄 @(isTrainingMobile ? "Eğitiliyor..." : "Modeli Eğit")
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Aylık Çizelge ve Doluluk Kısayol Kartı -->
+                    <div class="mobile-cal-shortcut-card" @onclick='() => currentTab = "calendar"'>
+                        <div style="display:flex;align-items:center;gap:10px">
+                            <div class="cal-mini-icon">
+                                <span class="cal-month-tag">@calMonth.ToString("MMM", L.Culture).ToUpper()</span>
+                                <span class="cal-day-tag">@DateTime.Today.Day</span>
+                            </div>
+                            <div>
+                                <div style="font-weight:700;color:#fff;font-size:0.88rem">🗓️ Aylık Çizelge & Oda Takvimi</div>
+                                <div style="font-size:0.74rem;color:#94a3b8">Bu ay ortalama doluluk: <b style="color:#38bdf8">%@calAvgOccupancy</b> · @calTotalNights Gece</div>
+                            </div>
+                        </div>
+                        <span style="font-size:0.8rem;color:#38bdf8;font-weight:700">Aç →</span>
+                    </div>
+
+                    <!-- Hızlı İşlemler Kısayolları -->
+                    <div class="mobile-sec-head">
+                        <h3>⚡ Hızlı Patron Aksiyonları</h3>
+                    </div>
+                    <div class="quick-actions-bar">
+                        <div class="quick-action-card" @onclick="() => showQuickBookSheet = true">
+                            <span class="qa-icon">➕</span>
+                            <div>
+                                <div class="qa-title">Hızlı Rezervasyon</div>
+                                <div class="qa-desc">Anında oda tahsisi yap</div>
+                            </div>
+                        </div>
+
+                        <div class="quick-action-card" @onclick="() => showQuickRateSheet = true">
+                            <span class="qa-icon">💶</span>
+                            <div>
+                                <div class="qa-title">Fiyat Güncelle</div>
+                                <div class="qa-desc">Taban fiyatı artır / indir</div>
+                            </div>
+                        </div>
+
+                        <div class="quick-action-card" @onclick="ToggleStopSellAll">
+                            <span class="qa-icon">@(isStopSellActive ? "🟢" : "🚫")</span>
+                            <div>
+                                <div class="qa-title">@(isStopSellActive ? "Satışı Aç" : "Stop-Sell Kapat")</div>
+                                <div class="qa-desc">Tüm OTA kanalları</div>
+                            </div>
+                        </div>
+
+                        <div class="quick-action-card" @onclick="() => showMaintenanceSheet = true">
+                            <span class="qa-icon">🛠️</span>
+                            <div>
+                                <div class="qa-title">Arıza Bildir</div>
+                                <div class="qa-desc">Teknik personele ilet</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Bugün Beklenen VIP Misafirler -->
+                    <div class="mobile-sec-head">
+                        <h3>👑 Bugün Gelenler & VIP Misafirler</h3>
+                        <button @onclick='() => currentTab = "frontdesk"'>Tümünü Gör (@todayArrivals.Count)</button>
+                    </div>
+
+                    @if (todayArrivals.Count == 0)
+                    {
+                        <div class="card" style="text-align:center;padding:16px;color:var(--m-muted)">
+                            Bugün için beklenen yeni giriş bulunmuyor.
+                        </div>
+                    }
+                    @foreach (var res in todayArrivals.Take(3))
+                    {
+                        var rm = res.Rooms.FirstOrDefault()?.Room;
+                        <div class="guest-arrival-card">
+                            <div class="guest-info-block">
+                                <div class="guest-name-row">
+                                    <b>@res.Guest?.FullName</b>
+                                    @if (res.Guest?.IsVip == true)
+                                    {
+                                        <span class="badge b-ok" style="font-size:0.65rem">VIP</span>
+                                    }
+                                </div>
+                                <div class="guest-details-meta">
+                                    <span>🚪 Oda @(rm?.Number ?? "Atanmadı")</span>
+                                    <span>👥 @res.Adults Yetişkin</span>
+                                    <span>💰 @Fmt.Money(res.TotalAmount)</span>
+                                </div>
+                            </div>
+                            <div class="guest-contact-actions">
+                                @if (!string.IsNullOrWhiteSpace(res.Guest?.Phone))
+                                {
+                                    <a class="btn-contact phone" href="tel:@res.Guest.Phone" title="Misafiri Ara">📞</a>
+                                    <a class="btn-contact whatsapp" href="https://wa.me/@(FormatWhatsApp(res.Guest.Phone))" target="_blank" title="WhatsApp Mesajı">💬</a>
+                                }
+                            </div>
+                        </div>
+                    }
+                }
+
+                <!-- TAB: AYLIK ÇİZELGE & ODA TAKVİMİ -->
+                @if (currentTab == "calendar")
+                {
+                    <!-- Ay Gezinme ve Başlık Çubuğu -->
+                    <div class="mobile-cal-nav">
+                        <button class="cal-nav-btn" @onclick="PrevCalMonth" title="Önceki Ay">◀</button>
+                        <div class="cal-nav-center">
+                            <div class="cal-nav-month-title">@calMonth.ToString("MMMM yyyy", L.Culture)</div>
+                            <button class="cal-today-pill" @onclick="GoToToday">🎯 Bugün (@DateTime.Today.ToString("dd MMM", L.Culture))</button>
+                        </div>
+                        <button class="cal-nav-btn" @onclick="NextCalMonth" title="Sonraki Ay">▶</button>
+                    </div>
+
+                    <!-- Aylık Flash KPI Göstergeleri -->
+                    <div class="mobile-cal-kpi-grid">
+                        <div class="cal-kpi-item">
+                            <div class="cal-kpi-val" style="color:#38bdf8">%@calAvgOccupancy</div>
+                            <div class="cal-kpi-label">Ort. Doluluk</div>
+                        </div>
+                        <div class="cal-kpi-item">
+                            <div class="cal-kpi-val" style="color:#34d399">@calTotalNights</div>
+                            <div class="cal-kpi-label">Geceleme</div>
+                        </div>
+                        <div class="cal-kpi-item">
+                            <div class="cal-kpi-val" style="color:#fbbf24">@Fmt.Money(calTotalRevenue)</div>
+                            <div class="cal-kpi-label">Aylık Gelir</div>
+                        </div>
+                        <div class="cal-kpi-item">
+                            <div class="cal-kpi-val" style="color:#a78bfa;font-size:0.78rem">@calPeakDayInfo</div>
+                            <div class="cal-kpi-label">Zirve Gün</div>
+                        </div>
+                    </div>
+
+                    <!-- Görünüm Seçici (Segmented Control) -->
+                    <div class="mobile-view-tabs">
+                        <button class="mobile-view-tab-btn @(calViewMode == "grid" ? "active" : "")" @onclick='() => calViewMode = "grid"'>
+                            🗓️ Aylık Doluluk Matrisi
+                        </button>
+                        <button class="mobile-view-tab-btn @(calViewMode == "tape" ? "active" : "")" @onclick='() => calViewMode = "tape"'>
+                            📋 Oda Tape Çizelgesi
+                        </button>
+                    </div>
+
+                    @if (calViewMode == "grid")
+                    {
+                        <!-- 7 Sütunlu Aylık Takvim Matrisi -->
+                        <div class="mobile-month-calendar-box">
+                            <div class="cal-dow-row">
+                                <div class="cal-dow-cell">Pzt</div>
+                                <div class="cal-dow-cell">Sal</div>
+                                <div class="cal-dow-cell">Çar</div>
+                                <div class="cal-dow-cell">Per</div>
+                                <div class="cal-dow-cell">Cum</div>
+                                <div class="cal-dow-cell weekend">Cmt</div>
+                                <div class="cal-dow-cell weekend">Paz</div>
+                            </div>
+
+                            <div class="cal-days-grid">
+                                <!-- Ay başı boşlukları -->
+                                @for (int i = 0; i < calFirstDayOffset; i++)
+                                {
+                                    <div class="mobile-day-cell empty"></div>
+                                }
+
+                                <!-- Günlük Hücreler -->
+                                @for (int day = 1; day <= calDaysInMonth; day++)
+                                {
+                                    var dt = new DateTime(calMonth.Year, calMonth.Month, day);
+                                    var isToday = dt.Date == DateTime.Today;
+                                    var isSelected = dt.Date == selectedCalDate.Date;
+
+                                    var dayRrs = calMonthResRooms.Where(rr => rr.CheckIn.Date <= dt.Date && rr.CheckOut.Date > dt.Date).ToList();
+                                    var occCount = dayRrs.Select(rr => rr.RoomId).Distinct().Count();
+                                    var occPct = hotelRooms.Count > 0 ? Math.Round((double)occCount / hotelRooms.Count * 100, 0) : 0;
+
+                                    var arrivals = calMonthResRooms.Count(rr => rr.CheckIn.Date == dt.Date);
+                                    var departures = calMonthResRooms.Count(rr => rr.CheckOut.Date == dt.Date);
+
+                                    var occClass = occCount == 0 ? "empty" : (occPct >= 80 ? "high" : (occPct >= 40 ? "med" : "low"));
+
+                                    <div class="mobile-day-cell @(isToday ? "today" : "") @(isSelected ? "selected" : "")" 
+                                         @onclick="() => SelectCalendarDay(dt)">
+                                        <div class="day-num">@day</div>
+                                        <div class="day-occ-pill @occClass">
+                                            @(occCount > 0 ? $"%{occPct}" : "—")
+                                        </div>
+                                        <div class="day-dots-row">
+                                            @if (arrivals > 0)
+                                            {
+                                                <span class="dot-indicator arrival" title="@arrivals Yeni Giriş"></span>
+                                            }
+                                            @if (departures > 0)
+                                            {
+                                                <span class="dot-indicator departure" title="@departures Çıkış"></span>
+                                            }
+                                        </div>
+                                    </div>
+                                }
+                            </div>
+
+                            <div style="display:flex;justify-content:space-around;font-size:0.65rem;color:var(--m-muted);margin-top:8px;padding-top:6px;border-top:1px solid rgba(255,255,255,0.06)">
+                                <span>🟢 %80+ Dolu</span>
+                                <span>🔵 %40-%79</span>
+                                <span>🟡 %1-%39</span>
+                                <span><span style="color:#38bdf8">●</span> Giriş</span>
+                                <span><span style="color:#f59e0b">●</span> Çıkış</span>
+                            </div>
+                        </div>
+                    }
+                    else
+                    {
+                        <!-- Tape Chart (Gantt Oda Çizelgesi) -->
+                        <div class="mobile-sec-head" style="margin-top:0;margin-bottom:6px">
+                            <span style="font-size:0.75rem;color:var(--m-muted)">Oda Bazlı Rezervasyon Çizelgesi (Yana Kaydırın)</span>
+                        </div>
+
+                        <!-- Oda Tipi Hızlı Filtre -->
+                        <div style="display:flex;gap:6px;overflow-x:auto;padding-bottom:8px;margin-bottom:8px;scrollbar-width:none">
+                            <button class="filter-chip-btn @(calRoomTypeFilter == 0 ? "active" : "")" @onclick="() => calRoomTypeFilter = 0">Tüm Tipler</button>
+                            @foreach (var rt in hotelRoomTypes)
+                            {
+                                <button class="filter-chip-btn @(calRoomTypeFilter == rt.Id ? "active" : "")" @onclick="() => calRoomTypeFilter = rt.Id">
+                                    @rt.Name
+                                </button>
+                            }
+                        </div>
+
+                        <div class="mobile-tape-wrapper">
+                            <div class="mobile-tape-table">
+                                <!-- Başlık Satırı -->
+                                <div class="tape-row header">
+                                    <div class="tape-room-col">
+                                        <b style="font-size:0.72rem;color:#38bdf8">ODA / TİP</b>
+                                    </div>
+                                    @for (int day = 1; day <= calDaysInMonth; day++)
+                                    {
+                                        var dt = new DateTime(calMonth.Year, calMonth.Month, day);
+                                        var isWeekend = dt.DayOfWeek == DayOfWeek.Saturday || dt.DayOfWeek == DayOfWeek.Sunday;
+                                        var isToday = dt.Date == DateTime.Today;
+                                        var isSelected = dt.Date == selectedCalDate.Date;
+
+                                        <div class="tape-day-cell @(isWeekend ? "weekend" : "") @(isToday ? "today" : "") @(isSelected ? "selected" : "")"
+                                             @onclick="() => SelectCalendarDay(dt)" style="cursor:pointer">
+                                            <div style="font-weight:700;color:@(isToday ? "#38bdf8" : (isWeekend ? "#fbbf24" : "#cbd5e1"))">@day</div>
+                                            <div style="font-size:0.55rem;opacity:0.6">@dt.ToString("ddd", L.Culture).Substring(0, 1)</div>
+                                        </div>
+                                    }
+                                </div>
+
+                                <!-- Oda Satırları -->
+                                @foreach (var r in hotelRooms.Where(rm => calRoomTypeFilter == 0 || rm.RoomTypeId == calRoomTypeFilter))
+                                {
+                                    <div class="tape-row">
+                                        <div class="tape-room-col">
+                                            <span class="tape-room-num">🚪 @r.Number</span>
+                                            <span class="tape-room-type">@r.RoomType?.Name</span>
+                                        </div>
+                                        @for (int day = 1; day <= calDaysInMonth; day++)
+                                        {
+                                            var dt = new DateTime(calMonth.Year, calMonth.Month, day);
+                                            var isWeekend = dt.DayOfWeek == DayOfWeek.Saturday || dt.DayOfWeek == DayOfWeek.Sunday;
+                                            var isToday = dt.Date == DateTime.Today;
+                                            var isSelected = dt.Date == selectedCalDate.Date;
+
+                                            var rr = calMonthResRooms.FirstOrDefault(x => x.RoomId == r.Id && x.CheckIn.Date <= dt.Date && x.CheckOut.Date > dt.Date);
+
+                                            <div class="tape-day-cell @(isWeekend ? "weekend" : "") @(isToday ? "today" : "") @(isSelected ? "selected" : "")"
+                                                 @onclick="() => SelectCalendarDay(dt)">
+                                                @if (rr != null && rr.Reservation != null)
+                                                {
+                                                    var isStart = rr.CheckIn.Date == dt.Date;
+                                                    <div class="tape-res-bar status-@rr.Reservation.Status" 
+                                                         @onclick:stopPropagation="true"
+                                                         @onclick="() => OpenReservationDetailFromCal(rr.Reservation)"
+                                                         title="@rr.Reservation.Guest?.FullName (@rr.Reservation.Code)">
+                                                        @(isStart ? $"{rr.Reservation.Guest?.LastName} ({rr.Reservation.Code})" : "—")
+                                                    </div>
+                                                }
+                                            </div>
+                                        }
+                                    </div>
+                                }
+                            </div>
+                        </div>
+                    }
+
+                    <!-- Seçili Gün Detay Paneli (Oda & Misafir Dökümü) -->
+                    <div class="mobile-day-detail-panel">
+                        <div class="day-detail-head">
+                            <div>
+                                <div style="font-size:0.7rem;color:#38bdf8;font-weight:700;text-transform:uppercase;letter-spacing:0.04em">
+                                    SEÇİLİ GÜNÜN ÇİZELGESİ
+                                </div>
+                                <div class="day-detail-date-title">
+                                    📅 @selectedCalDate.ToString("dd MMMM yyyy, dddd", L.Culture)
+                                    @if (selectedCalDate.Date == DateTime.Today)
+                                    {
+                                        <span class="badge b-ok" style="font-size:0.65rem;margin-left:4px">Bugün</span>
+                                    }
+                                </div>
+                            </div>
+                            <span class="day-detail-occ-badge @(SelectedDayOccPct >= 80 ? "b-ok" : (SelectedDayOccPct >= 40 ? "b-info" : "b-warn"))">
+                                %@SelectedDayOccPct Dolu
+                            </span>
+                        </div>
+
+                        <!-- Seçili Gün Hızlı İstatistikleri -->
+                        <div style="display:flex;justify-content:space-between;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);border-radius:12px;padding:8px 12px;margin-bottom:12px;font-size:0.75rem">
+                            <span>🟢 <b>@SelectedDayOccupiedCount</b> Dolu Oda</span>
+                            <span>✨ <b>@(hotelRooms.Count - SelectedDayOccupiedCount)</b> Müsait</span>
+                            <span>🛬 <b>@SelectedDayArrivalsCount</b> Giriş</span>
+                            <span>🛫 <b>@SelectedDayDeparturesCount</b> Çıkış</span>
+                        </div>
+
+                        <!-- Seçili Güne Hızlı Rezervasyon Aç Butonu -->
+                        <button class="btn primary sm" style="width:100%;padding:9px;margin-bottom:12px;font-weight:700;font-size:0.8rem;display:flex;align-items:center;justify-content:center;gap:6px" 
+                                @onclick="() => OpenQuickBookForSelectedDay()">
+                            ➕ Bu Güne (@selectedCalDate.ToString("dd MMM", L.Culture)) Yeni Rezervasyon Aç
+                        </button>
+
+                        <!-- Filtre Çipleri -->
+                        <div class="mobile-filter-chips">
+                            <button class="filter-chip-btn @(calDayFilter == "all" ? "active" : "")" @onclick='() => calDayFilter = "all"'>
+                                Tüm Odalar (@hotelRooms.Count)
+                            </button>
+                            <button class="filter-chip-btn @(calDayFilter == "occupied" ? "active" : "")" @onclick='() => calDayFilter = "occupied"'>
+                                👤 Dolu (@SelectedDayOccupiedCount)
+                            </button>
+                            <button class="filter-chip-btn @(calDayFilter == "available" ? "active" : "")" @onclick='() => calDayFilter = "available"'>
+                                ✨ Müsait (@(hotelRooms.Count - SelectedDayOccupiedCount))
+                            </button>
+                            <button class="filter-chip-btn @(calDayFilter == "arrivals" ? "active" : "")" @onclick='() => calDayFilter = "arrivals"'>
+                                🛬 Girişler (@SelectedDayArrivalsCount)
+                            </button>
+                            <button class="filter-chip-btn @(calDayFilter == "departures" ? "active" : "")" @onclick='() => calDayFilter = "departures"'>
+                                🛫 Çıkışlar (@SelectedDayDeparturesCount)
+                            </button>
+                        </div>
+
+                        <!-- Oda ve Misafir Kartları -->
+                        <div style="display:flex;flex-direction:column;gap:8px">
+                            @if (!FilteredDayRooms.Any())
+                            {
+                                <div style="text-align:center;padding:16px;color:var(--m-muted);font-size:0.8rem">
+                                    Bu filtreye uygun oda bulunamadı.
+                                </div>
+                            }
+
+                            @foreach (var r in FilteredDayRooms)
+                            {
+                                var activeRr = SelectedDayActiveResRooms.FirstOrDefault(x => x.RoomId == r.Id);
+                                var isOccupied = activeRr != null;
+                                var res = activeRr?.Reservation;
+                                var isArrival = isOccupied && res?.CheckIn.Date == selectedCalDate.Date;
+                                var isDeparture = isOccupied && res?.CheckOut.Date == selectedCalDate.Date;
+
+                                <div class="mobile-room-res-card">
+                                    <div class="room-card-head">
+                                        <div class="room-card-title">
+                                            <span style="font-size:1.1rem">🚪</span>
+                                            <div>
+                                                <b class="room-card-num">Oda @r.Number</b>
+                                                <span class="room-card-type-sub">· @r.RoomType?.Name (Kat @(r.Floor?.Number ?? 1))</span>
+                                            </div>
+                                        </div>
+
+                                        @if (isOccupied)
+                                        {
+                                            @if (isArrival)
+                                            {
+                                                <span class="badge b-info" style="font-size:0.65rem">🛬 Giriş Yapacak</span>
+                                            }
+                                            else if (isDeparture)
+                                            {
+                                                <span class="badge b-warn" style="font-size:0.65rem">🛫 Çıkış Yapacak</span>
+                                            }
+                                            else
+                                            {
+                                                <span class="badge b-ok" style="font-size:0.65rem">👤 Konaklıyor</span>
+                                            }
+                                        }
+                                        else
+                                        {
+                                            <span class="badge @(r.Housekeeping == HkStatus.Clean ? "b-ok" : "b-bad")" style="font-size:0.65rem">
+                                                @(r.Housekeeping == HkStatus.Clean ? "✨ Müsait (Temiz)" : "🧹 Müsait (Kirli)")
+                                            </span>
+                                        }
+                                    </div>
+
+                                    @if (isOccupied && res != null)
+                                    {
+                                        var paid = res.Folio?.Payments.Sum(p => p.Amount) ?? 0;
+                                        var balance = res.TotalAmount - paid;
+
+                                        <div class="room-card-body">
+                                            <div class="room-guest-meta">
+                                                <div style="font-weight:700;color:#fff;font-size:0.85rem">
+                                                    @res.Guest?.FullName
+                                                    @if (res.Guest?.IsVip == true)
+                                                    {
+                                                        <span class="badge b-ok" style="font-size:0.6rem">VIP</span>
+                                                    }
+                                                </div>
+                                                <div style="color:var(--m-muted);font-size:0.72rem;margin-top:2px">
+                                                    📅 @res.CheckIn.ToString("dd.MM") - @res.CheckOut.ToString("dd.MM") (@((res.CheckOut - res.CheckIn).Days) Gece)
+                                                    · #@res.Code
+                                                </div>
+                                            </div>
+                                            <div style="text-align:right">
+                                                <div style="font-size:0.82rem;font-weight:700;color:#fff">@Fmt.Money(res.TotalAmount)</div>
+                                                @if (balance > 0)
+                                                {
+                                                    <div style="font-size:0.68rem;color:#f43f5e;font-weight:600">Kalan: @Fmt.Money(balance)</div>
+                                                }
+                                                else
+                                                {
+                                                    <div style="font-size:0.68rem;color:#34d399">Ödendi ✓</div>
+                                                }
+                                            </div>
+                                        </div>
+
+                                        <div class="room-card-actions">
+                                            @if (!string.IsNullOrWhiteSpace(res.Guest?.Phone))
+                                            {
+                                                <a class="btn-contact phone" href="tel:@res.Guest.Phone" title="Ara" style="width:30px;height:30px;font-size:0.85rem">📞</a>
+                                                <a class="btn-contact whatsapp" href="https://wa.me/@(FormatWhatsApp(res.Guest.Phone))" target="_blank" title="WhatsApp" style="width:30px;height:30px;font-size:0.85rem">💬</a>
+                                            }
+
+                                            @if (res.Status != ResStatus.CheckedIn && selectedCalDate.Date == res.CheckIn.Date)
+                                            {
+                                                <button class="btn sm ok" style="padding:5px 8px;font-size:0.72rem" @onclick="() => CheckInReservation(res)">
+                                                    🛬 Giriş Yap
+                                                </button>
+                                            }
+                                            else if (res.Status == ResStatus.CheckedIn && selectedCalDate.Date == res.CheckOut.Date)
+                                            {
+                                                <button class="btn sm warn" style="padding:5px 8px;font-size:0.72rem" @onclick="() => CheckOutReservation(res)">
+                                                    🛫 Çıkış Al
+                                                </button>
+                                            }
+
+                                            <button class="btn sm" style="padding:5px 8px;font-size:0.72rem" @onclick="() => OpenReservationDetailFromCal(res)">
+                                                👁️ Detay
+                                            </button>
+                                        </div>
+                                    }
+                                    else
+                                    {
+                                        <div class="room-card-body" style="background:transparent;padding:4px 0">
+                                            <div style="font-size:0.74rem;color:var(--m-muted)">
+                                                Gecelik Taban: <b style="color:#2dd4bf">@Fmt.Money(r.RoomType?.BasePrice ?? 3000)</b>
+                                            </div>
+                                            <button class="btn primary sm" style="padding:6px 12px;font-size:0.72rem;font-weight:700" 
+                                                    @onclick="() => OpenQuickBookForSelectedDay(r.Id)">
+                                                ➕ Rezerve Et
+                                            </button>
+                                        </div>
+                                    }
+                                </div>
+                            }
+                        </div>
+                    </div>
+                }
+
+                <!-- TAB 2: ÖN BÜRO & GİRİŞ / ÇIKIŞLAR -->
+                @if (currentTab == "frontdesk")
+                {
+                    <div class="mobile-sec-head" style="margin-top:0">
+                        <h3>🛬 Bugün Beklenen Girişler (@todayArrivals.Count)</h3>
+                    </div>
+
+                    @if (todayArrivals.Count == 0)
+                    {
+                        <div class="card mb" style="padding:16px;color:var(--m-muted);text-align:center">
+                            Bugün giriş yapacak misafir yok.
+                        </div>
+                    }
+                    @foreach (var res in todayArrivals)
+                    {
+                        var rm = res.Rooms.FirstOrDefault()?.Room;
+                        <div class="guest-arrival-card">
+                            <div class="guest-info-block">
+                                <div class="guest-name-row">
+                                    <b>@res.Guest?.FullName</b>
+                                    <span class="badge b-info">@res.Code</span>
+                                </div>
+                                <div class="guest-details-meta">
+                                    <span>🚪 Oda @(rm?.Number ?? "Atanmadı")</span>
+                                    <span>📅 @res.CheckIn.ToString("dd.MM") - @res.CheckOut.ToString("dd.MM")</span>
+                                    <span>💰 @Fmt.Money(res.TotalAmount)</span>
+                                </div>
+                            </div>
+                            <div class="guest-contact-actions">
+                                @if (!string.IsNullOrWhiteSpace(res.Guest?.Phone))
+                                {
+                                    <a class="btn-contact phone" href="tel:@res.Guest.Phone">📞</a>
+                                    <a class="btn-contact whatsapp" href="https://wa.me/@(FormatWhatsApp(res.Guest.Phone))" target="_blank">💬</a>
+                                }
+                                <button class="btn sm ok" style="padding:6px 10px;font-size:0.75rem" @onclick="() => CheckInReservation(res)">
+                                    Giriş Yap
+                                </button>
+                            </div>
+                        </div>
+                    }
+
+                    <div class="mobile-sec-head">
+                        <h3>🛫 Bugün Beklenen Çıkışlar (@todayDepartures.Count)</h3>
+                    </div>
+
+                    @if (todayDepartures.Count == 0)
+                    {
+                        <div class="card mb" style="padding:16px;color:var(--m-muted);text-align:center">
+                            Bugün çıkış yapacak misafir yok.
+                        </div>
+                    }
+                    @foreach (var res in todayDepartures)
+                    {
+                        var rm = res.Rooms.FirstOrDefault()?.Room;
+                        var paid = res.Folio?.Payments.Sum(p => p.Amount) ?? 0;
+                        var balance = res.TotalAmount - paid;
+
+                        <div class="guest-arrival-card">
+                            <div class="guest-info-block">
+                                <div class="guest-name-row">
+                                    <b>@res.Guest?.FullName</b>
+                                    <span class="badge b-warn">Oda @(rm?.Number ?? "-")</span>
+                                </div>
+                                <div class="guest-details-meta">
+                                    <span>Bakiye: <b style="color:@(balance > 0 ? "#f43f5e" : "#34d399")">@Fmt.Money(balance)</b></span>
+                                    <span>Toplam: @Fmt.Money(res.TotalAmount)</span>
+                                </div>
+                            </div>
+                            <div class="guest-contact-actions">
+                                <button class="btn sm" style="padding:6px 10px;font-size:0.75rem" @onclick="() => CheckOutReservation(res)">
+                                    Çıkış Al
+                                </button>
+                            </div>
+                        </div>
+                    }
+                }
+
+                <!-- TAB 3: ODALAR & TEMİZLİK MATRİSİ -->
+                @if (currentTab == "rooms")
+                {
+                    <div class="mobile-sec-head" style="margin-top:0">
+                        <h3>🚪 Hızlı Oda & Temizlik Matrisi</h3>
+                        <span class="badge b-info">@hotelRooms.Count Oda</span>
+                    </div>
+
+                    <!-- Kat Seçici Filtre -->
+                    <div style="display:flex;gap:6px;overflow-x:auto;padding-bottom:10px;margin-bottom:12px">
+                        <button class="btn sm @(selectedFloorFilter == 0 ? "primary" : "")" @onclick="() => selectedFloorFilter = 0">Tüm Katlar</button>
+                        @foreach (var fl in hotelFloors)
+                        {
+                            <button class="btn sm @(selectedFloorFilter == fl.Id ? "primary" : "")" @onclick="() => selectedFloorFilter = fl.Id">
+                                @fl.Name
+                            </button>
+                        }
+                    </div>
+
+                    <div class="mini-room-rack-grid">
+                        @foreach (var r in FilteredRooms)
+                        {
+                            var isOccupied = occupiedRoomIds.Contains(r.Id);
+                            var isDirty = r.Housekeeping == HkStatus.Dirty;
+                            var cls = isOccupied ? "occupied" : (isDirty ? "dirty" : "clean");
+
+                            <div class="mini-room-pill @cls" @onclick="() => ToggleRoomStatus(r)">
+                                <b>@r.Number</b>
+                                <small>@(isOccupied ? "👤 Dolu" : (isDirty ? "🧹 Kirli" : "✨ Temiz"))</small>
+                            </div>
+                        }
+                    </div>
+
+                    <div class="alert info" style="font-size:0.78rem;margin-top:14px">
+                        💡 <b>İpucu:</b> Kirli odaya dokunarak anında <b>"✨ Temiz"</b> yapabilir, kat hizmetleri durumunu güncelleyebilirsiniz.
+                    </div>
+                }
+
+                <!-- TAB 4: KANAL & FİYAT KONTROLÜ -->
+                @if (currentTab == "sales")
+                {
+                    <div class="mobile-sec-head" style="margin-top:0">
+                        <h3>🌐 OTA Kanal Bağlantıları</h3>
+                        <button @onclick="SyncChannelsNow">🔄 Senkronize Et</button>
+                    </div>
+
+                    <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:20px">
+                        @foreach (var ch in channels)
+                        {
+                            <div class="guest-arrival-card">
+                                <div>
+                                    <b style="font-size:0.92rem;color:#fff">@ch.Name</b>
+                                    <div class="muted" style="font-size:0.75rem">Komisyon: %@ch.CommissionRate · Eşitleme: @(ch.LastSync?.ToString("HH:mm") ?? "-")</div>
+                                </div>
+                                <div>
+                                    <button class="btn sm @(ch.IsConnected ? "ok" : "")" @onclick="() => ToggleChannel(ch)">
+                                        @(ch.IsConnected ? "🟢 Açık" : "⚪ Kapalı")
+                                    </button>
+                                </div>
+                            </div>
+                        }
+                    </div>
+
+                    <div class="mobile-sec-head">
+                        <h3>💶 Taban Oda Fiyatları</h3>
+                        <button @onclick="() => showQuickRateSheet = true">⚡ Hızlı Fiyat Değiştir</button>
+                    </div>
+
+                    <div style="display:flex;flex-direction:column;gap:8px">
+                        @foreach (var rt in hotelRoomTypes)
+                        {
+                            <div class="guest-arrival-card">
+                                <div>
+                                    <b style="font-size:0.9rem;color:#fff">@rt.Name</b>
+                                    <div class="muted" style="font-size:0.75rem">👥 @rt.MaxCapacity Kişilik · 📐 @rt.AreaM2 m²</div>
+                                </div>
+                                <div style="text-align:right">
+                                    <b style="color:#2dd4bf;font-size:1.05rem">@Fmt.Money(rt.BasePrice)</b>
+                                    <small class="muted" style="display:block">/gece</small>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                }
+
+                <!-- TAB 5: BİLDİRİMLER & PATRON ALARMLARI -->
+                @if (currentTab == "notifications")
+                {
+                    <div class="mobile-sec-head" style="margin-top:0">
+                        <h3>🔔 Patron Bildirimleri & Güvenlik</h3>
+                        <button @onclick="ClearNotifications">Tümünü Okundu Say</button>
+                    </div>
+
+                    <div style="display:flex;flex-direction:column;gap:10px">
+                        @foreach (var notif in notifications)
+                        {
+                            <div class="guest-arrival-card" style="border-left:4px solid @notif.Color">
+                                <div>
+                                    <div style="display:flex;align-items:center;gap:6px">
+                                        <span style="font-size:1.1rem">@notif.Icon</span>
+                                        <b style="font-size:0.86rem;color:#fff">@notif.Title</b>
+                                    </div>
+                                    <p style="margin:4px 0 0;font-size:0.78rem;color:#cbd5e1">@notif.Message</p>
+                                    <small class="muted" style="font-size:0.7rem;display:block;margin-top:4px">@notif.Time</small>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                }
+            }
+        </div>
+
+        <!-- Sabit Alt Navigasyon Çubuğu (Bottom Navigation Bar) -->
+        <nav class="phone-bottom-nav">
+            <button class="bottom-tab-item @(currentTab == "dash" ? "active" : "")" @onclick='() => currentTab = "dash"'>
+                <span class="tab-icon">📊</span>
+                <span>Özet</span>
+            </button>
+
+            <button class="bottom-tab-item @(currentTab == "calendar" ? "active" : "")" @onclick='() => currentTab = "calendar"'>
+                <span class="tab-icon">🗓️</span>
+                <span>Çizelge</span>
+            </button>
+
+            <!-- Ortada Parlayan Hızlı İşlem FAB Butonu -->
+            <button class="fab-center-btn" @onclick="() => showFabActionSheet = true" title="Hızlı İşlemler">
+                ⚡
+            </button>
+
+            <button class="bottom-tab-item @(currentTab == "frontdesk" ? "active" : "")" @onclick='() => currentTab = "frontdesk"'>
+                <span class="tab-icon">🛎️</span>
+                <span>Ön Büro</span>
+                @if (todayArrivalsCount > 0)
+                {
+                    <span class="tab-badge">@todayArrivalsCount</span>
+                }
+            </button>
+
+            <button class="bottom-tab-item @(currentTab == "rooms" ? "active" : "")" @onclick='() => currentTab = "rooms"'>
+                <span class="tab-icon">🚪</span>
+                <span>Odalar</span>
+                @if (dirtyRoomsCount > 0)
+                {
+                    <span class="tab-badge" style="background:#f59e0b">@dirtyRoomsCount</span>
+                }
+            </button>
+        </nav>
+
+        <!-- iPhone Home Indicator Çizgisi -->
+        <div class="home-indicator-bar"></div>
+
+        <!-- ================= BOTTOM SHEETS / MODALLAR ================= -->
+
+        <!-- 1. FAB Hızlı Aksiyon Bottom Sheet -->
+        @if (showFabActionSheet)
+        {
+            <div class="mobile-bottom-sheet">
+                <div class="sheet-handle"></div>
+                <div class="sheet-header">
+                    <h4>⚡ Hızlı Patron İşlemleri</h4>
+                    <button class="close-btn" @onclick="() => showFabActionSheet = false">✕</button>
+                </div>
+                <div class="quick-actions-bar" style="grid-template-columns:1fr;gap:8px">
+                    <div class="quick-action-card" style="background:rgba(14,165,233,0.15);border:1px solid rgba(56,189,248,0.4)" @onclick="OpenAiAssistantFromFab">
+                        <span class="qa-icon">🤖</span>
+                        <div>
+                            <div class="qa-title" style="color:#38bdf8">AI Copilot & Akıllı Karar Asistanı</div>
+                            <div class="qa-desc">Doluluk tahmini, iptal riskleri ve model eğitimi</div>
+                        </div>
+                    </div>
+                    <div class="quick-action-card" @onclick="OpenQuickBookFromFab">
+                        <span class="qa-icon">➕</span>
+                        <div>
+                            <div class="qa-title">Hızlı Rezervasyon Aç</div>
+                            <div class="qa-desc">Misafir adı ve oda tipiyle 10 saniyede kaydet</div>
+                        </div>
+                    </div>
+                    <div class="quick-action-card" @onclick='() => { showFabActionSheet = false; currentTab = "sales"; }'>
+                        <span class="qa-icon">🌐</span>
+                        <div>
+                            <div class="qa-title">Satış & OTA Kanal Yönetimi</div>
+                            <div class="qa-desc">Taban fiyatlar, Booking.com, Airbnb ve komisyonlar</div>
+                        </div>
+                    </div>
+                    <div class="quick-action-card" @onclick="OpenQuickRateFromFab">
+                        <span class="qa-icon">💶</span>
+                        <div>
+                            <div class="qa-title">Fiyatları %10 Artır / İndir</div>
+                            <div class="qa-desc">Doluluğa göre anlık dinamik gelir artışı</div>
+                        </div>
+                    </div>
+                    <div class="quick-action-card" @onclick="ToggleStopSellFromFab">
+                        <span class="qa-icon">🚫</span>
+                        <div>
+                            <div class="qa-title">Tüm Kanalları Kapat (Stop-Sell)</div>
+                            <div class="qa-desc">Otel dolduğunda OTA satışlarını anında durdur</div>
+                        </div>
+                    </div>
+                    <div class="quick-action-card" @onclick="OpenMaintenanceFromFab">
+                        <span class="qa-icon">🛠️</span>
+                        <div>
+                            <div class="qa-title">Oda Arıza & Teknik Servis Bildir</div>
+                            <div class="qa-desc">Klima, su tesisatı, elektrik acil iş emri</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        }
+
+        <!-- 2. Hızlı Rezervasyon Bottom Sheet -->
+        @if (showQuickBookSheet)
+        {
+            <div class="mobile-bottom-sheet">
+                <div class="sheet-handle"></div>
+                <div class="sheet-header">
+                    <h4>➕ Hızlı Rezervasyon Oluştur</h4>
+                    <button class="close-btn" @onclick="() => showQuickBookSheet = false">✕</button>
+                </div>
+
+                <div style="display:flex;flex-direction:column;gap:10px">
+                    <div>
+                        <label style="font-size:0.75rem;color:var(--m-muted)">Misafir Adı Soyadı</label>
+                        <input type="text" class="search" style="width:100%" placeholder="Örn: Burak Özdemir" @bind="newResGuestName" />
+                    </div>
+                    <div>
+                        <label style="font-size:0.75rem;color:var(--m-muted)">Telefon</label>
+                        <input type="text" class="search" style="width:100%" placeholder="+90 532 000 00 00" @bind="newResGuestPhone" />
+                    </div>
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+                        <div>
+                            <label style="font-size:0.75rem;color:var(--m-muted)">Oda Tipi</label>
+                            <select class="search" style="width:100%" @bind="newResRoomTypeId">
+                                @foreach (var rt in hotelRoomTypes)
+                                {
+                                    <option value="@rt.Id">@rt.Name (@Fmt.Money(rt.BasePrice))</option>
+                                }
+                            </select>
+                        </div>
+                        <div>
+                            <label style="font-size:0.75rem;color:var(--m-muted)">Gece Sayısı</label>
+                            <input type="number" min="1" max="14" class="search" style="width:100%" @bind="newResNights" />
+                        </div>
+                    </div>
+
+                    <button class="btn primary" style="margin-top:6px;width:100%;padding:12px;font-weight:700" @onclick="SaveQuickReservation">
+                        ✅ Rezervasyonu Onayla ve Odayı Ayır
+                    </button>
+                </div>
+            </div>
+        }
+
+        <!-- 3. Hızlı Fiyat Güncelleme Bottom Sheet -->
+        @if (showQuickRateSheet)
+        {
+            <div class="mobile-bottom-sheet">
+                <div class="sheet-handle"></div>
+                <div class="sheet-header">
+                    <h4>💶 Taban Fiyatları Hızlı Güncelle</h4>
+                    <button class="close-btn" @onclick="() => showQuickRateSheet = false">✕</button>
+                </div>
+
+                <p style="font-size:0.8rem;color:#cbd5e1;margin-bottom:12px">
+                    Seçili otelin (@currentHotel?.Name) tüm oda tiplerinin gecelik taban fiyatını anında artırabilir veya indirebilirsiniz.
+                </p>
+
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+                    <button class="btn ok" style="padding:12px;font-size:0.85rem;font-weight:700" @onclick="() => AdjustPrices(1.10m)">
+                        📈 %10 Artır
+                    </button>
+                    <button class="btn ok" style="padding:12px;font-size:0.85rem;font-weight:700" @onclick="() => AdjustPrices(1.20m)">
+                        🚀 %20 Artır
+                    </button>
+                    <button class="btn warn" style="padding:12px;font-size:0.85rem;font-weight:700" @onclick="() => AdjustPrices(0.90m)">
+                        📉 %10 İndir
+                    </button>
+                    <button class="btn warn" style="padding:12px;font-size:0.85rem;font-weight:700" @onclick="() => AdjustPrices(0.80m)">
+                        🔥 %20 İndir
+                    </button>
+                </div>
+            </div>
+        }
+
+        <!-- 4. Hızlı Arıza Bildirme Bottom Sheet -->
+        @if (showMaintenanceSheet)
+        {
+            <div class="mobile-bottom-sheet">
+                <div class="sheet-handle"></div>
+                <div class="sheet-header">
+                    <h4>🛠️ Acil Oda Arızası Bildir</h4>
+                    <button class="close-btn" @onclick="() => showMaintenanceSheet = false">✕</button>
+                </div>
+
+                <div style="display:flex;flex-direction:column;gap:10px">
+                    <div>
+                        <label style="font-size:0.75rem;color:var(--m-muted)">Oda Seçin</label>
+                        <select class="search" style="width:100%" @bind="maintRoomId">
+                            @foreach (var r in hotelRooms)
+                            {
+                                <option value="@r.Id">Oda @r.Number (@r.RoomType?.Name)</option>
+                            }
+                        </select>
+                    </div>
+                    <div>
+                        <label style="font-size:0.75rem;color:var(--m-muted)">Arıza Konusu</label>
+                        <input type="text" class="search" style="width:100%" placeholder="Örn: Klima soğutmuyor, TV çalışmıyor..." @bind="maintTitle" />
+                    </div>
+                    <button class="btn primary" style="width:100%;padding:12px;font-weight:700" @onclick="SaveQuickMaintenance">
+                        🚨 Teknik Ekibe İlet
+                    </button>
+                </div>
+            </div>
+        }
+
+        <!-- 5. Tesis Seçici Bottom Sheet -->
+        @if (showHotelPickerSheet)
+        {
+            <div class="mobile-bottom-sheet">
+                <div class="sheet-handle"></div>
+                <div class="sheet-header">
+                    <h4>🏢 Yönetilen Oteli Değiştir</h4>
+                    <button class="close-btn" @onclick="() => showHotelPickerSheet = false">✕</button>
+                </div>
+                <div style="display:flex;flex-direction:column;gap:8px;max-height:340px;overflow-y:auto">
+                    @foreach (var h in hotels)
+                    {
+                        <div class="guest-arrival-card" style="cursor:pointer;@(selectedHotelId == h.Id ? "border-color:#38bdf8;background:rgba(14,165,233,0.15)" : "")"
+                             @onclick="() => SelectHotelDirectly(h.Id)">
+                            <div>
+                                <b style="color:#fff;font-size:0.92rem">@h.Name</b>
+                                <div class="muted" style="font-size:0.75rem">📍 @h.City · ⭐ @h.Stars Yıldız</div>
+                            </div>
+                            @if (selectedHotelId == h.Id)
+                            {
+                                <span class="badge b-ok">Aktif</span>
+                            }
+                        </div>
+                    }
+                </div>
+            </div>
+        }
+
+        <!-- 6. Telefona Yükle / PWA Rehber Modalı -->
+        @if (showPwaGuideModal)
+        {
+            <div class="mobile-bottom-sheet">
+                <div class="sheet-handle"></div>
+                <div class="sheet-header">
+                    <h4>📲 Uygulamayı Telefona Yükleyin</h4>
+                    <button class="close-btn" @onclick="() => showPwaGuideModal = false">✕</button>
+                </div>
+                <div style="font-size:0.85rem;color:#cbd5e1;line-height:1.5">
+                    <p><b>OtelPro Mobil</b> modern Progressive Web App (PWA) mimarisiyle çalışır. App Store veya Google Play olmadan doğrudan telefonunuza native uygulama olarak yükleyebilirsiniz:</p>
+                    
+                    <div style="background:rgba(255,255,255,0.05);padding:10px 14px;border-radius:12px;margin-bottom:10px">
+                        <b>🍏 iPhone (Safari):</b>
+                        <ol style="margin:4px 0 0;padding-left:20px;font-size:0.8rem">
+                            <li>Alttaki <b>Paylaş (Share ⬆)</b> simgesine dokunun.</li>
+                            <li><b>"Ana Ekrana Ekle"</b> (Add to Home Screen) seçeneğine basın.</li>
+                        </ol>
+                    </div>
+
+                    <div style="background:rgba(255,255,255,0.05);padding:10px 14px;border-radius:12px;margin-bottom:12px">
+                        <b>🤖 Android (Chrome):</b>
+                        <ol style="margin:4px 0 0;padding-left:20px;font-size:0.8rem">
+                            <li>Sağ üstteki <b>Üç Nokta (⋮)</b> menüsüne dokunun.</li>
+                            <li><b>"Uygulamayı Yükle"</b> veya <b>"Ana Ekrana Ekle"</b> butonuna basın.</li>
+                        </ol>
+                    </div>
+
+                    <button class="btn primary" style="width:100%;padding:10px" @onclick="() => showPwaGuideModal = false">
+                        Anladım, Harika!
+                    </button>
+                </div>
+            </div>
+        }
+
+        <!-- 7. AI Copilot Bottom Sheet -->
+        @if (showAiCopilotSheet)
+        {
+            <div class="mobile-bottom-sheet">
+                <div class="sheet-handle"></div>
+                <div class="sheet-header">
+                    <div style="display:flex;align-items:center;gap:8px">
+                        <span style="font-size:1.4rem">🧠</span>
+                        <div>
+                            <h4 style="margin:0">OtelPro AI Copilot</h4>
+                            <small class="muted" style="font-size:0.7rem">%@Ml.ModelAccuracy FastTree Doğruluğu</small>
+                        </div>
+                    </div>
+                    <button class="close-btn" @onclick="() => showAiCopilotSheet = false">✕</button>
+                </div>
+
+                <div style="display:flex;gap:6px;overflow-x:auto;padding-bottom:8px;margin-bottom:10px;scrollbar-width:none">
+                    <button class="btn sm" style="font-size:0.72rem;white-space:nowrap" @onclick='() => SendMobileAiQuery("Bu hafta sonu doluluk tahmini nedir?")'>📈 Doluluk</button>
+                    <button class="btn sm" style="font-size:0.72rem;white-space:nowrap" @onclick='() => SendMobileAiQuery("Hangi rezervasyonlarda yüksek iptal riski var?")'>⚠️ İptal Riskleri</button>
+                    <button class="btn sm" style="font-size:0.72rem;white-space:nowrap" @onclick='() => SendMobileAiQuery("Hangi oda tipinin fiyatını artırmalıyım?")'>💶 Fiyat Önerisi</button>
+                    <button class="btn sm" style="font-size:0.72rem;white-space:nowrap" @onclick="TrainModelFromMobile">🧠 Modeli Eğit</button>
+                </div>
+
+                <div style="max-height:260px;overflow-y:auto;display:flex;flex-direction:column;gap:8px;padding-right:4px;margin-bottom:12px">
+                    @foreach (var msg in mobileAiMessages)
+                    {
+                        <div style="padding:10px 12px;border-radius:12px;font-size:0.82rem;line-height:1.4;@(msg.Role == "user" ? "background:#0284c7;align-self:flex-end;color:#fff;max-width:85%" : "background:rgba(30,41,59,0.9);border:1px solid rgba(255,255,255,0.08);color:#e2e8f0;align-self:flex-start;max-width:92%")">
+                            @((MarkupString)msg.Content.Replace("\n", "<br/>").Replace("**", "<b>"))
+                            @if (msg.Actions != null && msg.Actions.Count > 0)
+                            {
+                                <div style="display:flex;flex-direction:column;gap:5px;margin-top:8px;border-top:1px dashed rgba(255,255,255,0.15);padding-top:6px">
+                                    @foreach (var act in msg.Actions)
+                                    {
+                                        <a href="@act.Url" class="btn sm" style="font-size:0.75rem;padding:5px 8px;display:flex;justify-content:space-between;background:rgba(2,132,199,0.25);border:1px solid rgba(56,189,248,0.4);color:#fff;text-decoration:none;border-radius:8px">
+                                            <span>@act.Title</span>
+                                            <span style="color:#38bdf8">→</span>
+                                        </a>
+                                    }
+                                </div>
+                            }
+                        </div>
+                    }
+                    @if (isMobileAiThinking)
+                    {
+                        <div style="font-size:0.78rem;color:#38bdf8;padding:6px">🧠 ML.NET çıkarım yapıyor...</div>
+                    }
+                </div>
+
+                <div style="display:flex;gap:6px">
+                    <input type="text" class="search" style="flex:1" placeholder="Yapay zekaya bir şey sorun..." @bind="mobileAiInput" @bind:event="oninput" @onkeyup="HandleMobileAiKey" />
+                    <button class="btn primary sm" @onclick="SubmitMobileAiQuery" disabled="@isMobileAiThinking">Gönder</button>
+                </div>
+            </div>
+        }
+
+        <!-- 8. Rezervasyon Detay Bottom Sheet -->
+        @if (showResDetailSheet && selectedResDetail != null)
+        {
+            <div class="mobile-bottom-sheet">
+                <div class="sheet-handle"></div>
+                <div class="sheet-header">
+                    <div>
+                        <h4 style="margin:0">#@selectedResDetail.Code · @selectedResDetail.Guest?.FullName</h4>
+                        <small class="muted" style="font-size:0.72rem">@(selectedResDetail.Channel?.Name ?? "Direkt Satış")</small>
+                    </div>
+                    <button class="close-btn" @onclick="() => showResDetailSheet = false">✕</button>
+                </div>
+
+                <div style="display:flex;flex-direction:column;gap:10px;font-size:0.82rem">
+                    <div style="display:flex;justify-content:space-between;align-items:center;background:rgba(255,255,255,0.04);padding:10px;border-radius:12px">
+                        <div>
+                            <div style="font-size:0.7rem;color:var(--m-muted)">DURUM</div>
+                            <span class="badge b-ok">@selectedResDetail.Status</span>
+                        </div>
+                        <div>
+                            <div style="font-size:0.7rem;color:var(--m-muted)">TARİHLER</div>
+                            <b>@selectedResDetail.CheckIn.ToString("dd.MM.yyyy") - @selectedResDetail.CheckOut.ToString("dd.MM.yyyy")</b>
+                            <div style="font-size:0.7rem;color:#38bdf8">@((selectedResDetail.CheckOut - selectedResDetail.CheckIn).Days) Gece</div>
+                        </div>
+                        <div style="text-align:right">
+                            <div style="font-size:0.7rem;color:var(--m-muted)">TOPLAM</div>
+                            <b style="color:#34d399;font-size:0.95rem">@Fmt.Money(selectedResDetail.TotalAmount)</b>
+                        </div>
+                    </div>
+
+                    <div style="display:flex;gap:8px">
+                        @if (!string.IsNullOrWhiteSpace(selectedResDetail.Guest?.Phone))
+                        {
+                            <a class="btn primary sm" href="tel:@selectedResDetail.Guest.Phone" style="flex:1;padding:8px;text-align:center;text-decoration:none">
+                                📞 Misafiri Ara
+                            </a>
+                            <a class="btn ok sm" href="https://wa.me/@(FormatWhatsApp(selectedResDetail.Guest.Phone))" target="_blank" style="flex:1;padding:8px;text-align:center;text-decoration:none">
+                                💬 WhatsApp
+                            </a>
+                        }
+                    </div>
+
+                    <div style="display:flex;gap:8px;margin-top:6px">
+                        @if (selectedResDetail.Status != ResStatus.CheckedIn)
+                        {
+                            <button class="btn ok" style="flex:1;padding:10px;font-weight:700" @onclick="() => DoCheckInFromDetail(selectedResDetail)">
+                                🛬 Misafiri Giriş Yap
+                            </button>
+                        }
+                        @if (selectedResDetail.Status == ResStatus.CheckedIn)
+                        {
+                            <button class="btn warn" style="flex:1;padding:10px;font-weight:700" @onclick="() => DoCheckOutFromDetail(selectedResDetail)">
+                                🛫 Misafiri Çıkış Al
+                            </button>
+                        }
+                        <button class="btn danger sm" style="padding:10px" @onclick="() => DoCancelFromDetail(selectedResDetail)">
+                            ✕ İptal
+                        </button>
+                    </div>
+                </div>
+            </div>
+        }
+
+    </div>
+</div>
+
+@code {
+    int selectedHotelId;
+    Hotel? currentHotel;
+    List<Hotel> hotels = new();
+    List<Room> hotelRooms = new();
+    List<Floor> hotelFloors = new();
+    List<RoomType> hotelRoomTypes = new();
+    List<Channel> channels = new();
+
+    List<Reservation> todayArrivals = new();
+    List<Reservation> todayDepartures = new();
+    HashSet<int> occupiedRoomIds = new();
+
+    string currentTab = "dash";
+    bool isFullScreenMode = false;
+    bool loading = true;
+    int selectedFloorFilter = 0;
+
+    // Flash KPI'lar
+    double occupancyPct = 0;
+    int inHouseRooms = 0;
+    int totalRooms = 0;
+    int todayArrivalsCount = 0;
+    int todayDeparturesCount = 0;
+    int dirtyRoomsCount = 0;
+    int cleanRoomsCount = 0;
+    decimal todayRevenue = 0;
+    decimal adr = 0;
+    decimal cashBalance = 38400;
+    bool isStopSellActive = false;
+
+    // Sheet Gösterimleri
+    bool showFabActionSheet = false;
+    bool showQuickBookSheet = false;
+    bool showQuickRateSheet = false;
+    bool showMaintenanceSheet = false;
+    bool showHotelPickerSheet = false;
+    bool showPwaGuideModal = false;
+    bool showAiCopilotSheet = false;
+
+    // AI Değişkenleri
+    string mobileAiInput = "";
+    bool isMobileAiThinking = false;
+    bool isTrainingMobile = false;
+    int highRiskCancelCount = 2;
+    double avgWeekendOcc = 88;
+    List<CopilotMessage> mobileAiMessages = new();
+
+    // Formlar
+    string newResGuestName = "";
+    string newResGuestPhone = "";
+    int newResRoomTypeId = 0;
+    int newResNights = 2;
+
+    int maintRoomId = 0;
+    string maintTitle = "";
+
+    record MobileNotification(string Title, string Message, string Time, string Icon, string Color);
+    List<MobileNotification> notifications = new();
+    int unreadNotificationsCount = 3;
+
+    IEnumerable<Room> FilteredRooms => hotelRooms
+        .Where(r => selectedFloorFilter == 0 || r.FloorId == selectedFloorFilter);
+
+    // Aylık Çizelge & Oda Takvimi Değişkenleri
+    DateTime calMonth = new DateTime(DateTime.Today.Year, DateTime.Today.Month, 1);
+    DateTime selectedCalDate = DateTime.Today;
+    string calViewMode = "grid"; // "grid" | "tape"
+    string calDayFilter = "all"; // "all" | "occupied" | "available" | "arrivals" | "departures"
+    int calRoomTypeFilter = 0;
+    List<ReservationRoom> calMonthResRooms = new();
+    Reservation? selectedResDetail = null;
+    bool showResDetailSheet = false;
+
+    int calDaysInMonth => DateTime.DaysInMonth(calMonth.Year, calMonth.Month);
+    int calFirstDayOffset => ((int)new DateTime(calMonth.Year, calMonth.Month, 1).DayOfWeek + 6) % 7;
+    double calAvgOccupancy = 0;
+    int calTotalNights = 0;
+    decimal calTotalRevenue = 0;
+    string calPeakDayInfo = "";
+
+    List<ReservationRoom> SelectedDayActiveResRooms => calMonthResRooms
+        .Where(rr => rr.CheckIn.Date <= selectedCalDate.Date && rr.CheckOut.Date > selectedCalDate.Date)
+        .ToList();
+
+    int SelectedDayOccupiedCount => SelectedDayActiveResRooms.Select(rr => rr.RoomId).Distinct().Count();
+
+    double SelectedDayOccPct => hotelRooms.Count > 0 
+        ? Math.Min(100, Math.Round((double)SelectedDayOccupiedCount / hotelRooms.Count * 100, 0)) 
+        : 0;
+
+    int SelectedDayArrivalsCount => calMonthResRooms.Count(rr => rr.CheckIn.Date == selectedCalDate.Date);
+    int SelectedDayDeparturesCount => calMonthResRooms.Count(rr => rr.CheckOut.Date == selectedCalDate.Date);
+
+    IEnumerable<Room> FilteredDayRooms
+    {
+        get
+        {
+            var list = hotelRooms.AsEnumerable();
+            if (calRoomTypeFilter > 0)
+            {
+                list = list.Where(r => r.RoomTypeId == calRoomTypeFilter);
+            }
+
+            if (calDayFilter == "occupied")
+            {
+                var occIds = SelectedDayActiveResRooms.Select(x => x.RoomId).ToHashSet();
+                list = list.Where(r => occIds.Contains(r.Id));
+            }
+            else if (calDayFilter == "available")
+            {
+                var occIds = SelectedDayActiveResRooms.Select(x => x.RoomId).ToHashSet();
+                list = list.Where(r => !occIds.Contains(r.Id));
+            }
+            else if (calDayFilter == "arrivals")
+            {
+                var arrIds = calMonthResRooms.Where(x => x.CheckIn.Date == selectedCalDate.Date).Select(x => x.RoomId).ToHashSet();
+                list = list.Where(r => arrIds.Contains(r.Id));
+            }
+            else if (calDayFilter == "departures")
+            {
+                var depIds = calMonthResRooms.Where(x => x.CheckOut.Date == selectedCalDate.Date).Select(x => x.RoomId).ToHashSet();
+                list = list.Where(r => depIds.Contains(r.Id));
+            }
+
+            return list;
+        }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CurrentHotelState.InitAsync();
+        hotels = await Db.Hotels.AsNoTracking().OrderBy(h => h.Id).ToListAsync();
+
+        selectedHotelId = CurrentHotelState.SelectedHotelId > 0 ? CurrentHotelState.SelectedHotelId : (hotels.FirstOrDefault()?.Id ?? 1);
+        await LoadHotelDataAsync();
+        GenerateNotifications();
+    }
+
+    async Task LoadHotelDataAsync()
+    {
+        loading = true;
+        currentHotel = hotels.FirstOrDefault(h => h.Id == selectedHotelId);
+        hotelRooms = await Db.Rooms.Where(r => r.HotelId == selectedHotelId).Include(r => r.RoomType).Include(r => r.Floor).OrderBy(r => r.Number).ToListAsync();
+        hotelFloors = await Db.Floors.Where(f => f.HotelId == selectedHotelId).OrderBy(f => f.Number).ToListAsync();
+        hotelRoomTypes = await Db.RoomTypes.Where(rt => rt.HotelId == selectedHotelId).ToListAsync();
+        channels = await Db.Channels.OrderBy(c => c.Name).ToListAsync();
+
+        if (hotelRoomTypes.Count > 0 && newResRoomTypeId == 0)
+        {
+            newResRoomTypeId = hotelRoomTypes[0].Id;
+        }
+        if (hotelRooms.Count > 0 && maintRoomId == 0)
+        {
+            maintRoomId = hotelRooms[0].Id;
+        }
+
+        var today = DateTime.Today;
+
+        // In-house & Occupancy
+        var inHouse = await Db.Reservations
+            .Include(r => r.Guest)
+            .Include(r => r.Rooms).ThenInclude(rm => rm.Room)
+            .Where(r => r.Status == ResStatus.CheckedIn && r.Rooms.Any(rm => rm.Room!.HotelId == selectedHotelId))
+            .ToListAsync();
+
+        occupiedRoomIds = inHouse
+            .SelectMany(r => r.Rooms)
+            .Where(rm => rm.RoomId.HasValue && rm.Room!.HotelId == selectedHotelId)
+            .Select(rm => rm.RoomId!.Value)
+            .ToHashSet();
+
+        totalRooms = hotelRooms.Count(r => r.Status != RoomStatus.OutOfOrder);
+        inHouseRooms = occupiedRoomIds.Count;
+        occupancyPct = totalRooms > 0 ? Math.Round((double)inHouseRooms / totalRooms * 100, 1) : 0;
+
+        // Arrivals (Girişler)
+        todayArrivals = await Db.Reservations
+            .Include(r => r.Guest)
+            .Include(r => r.Rooms).ThenInclude(rm => rm.Room)
+            .Where(r => r.CheckIn == today && r.Status == ResStatus.Confirmed && r.Rooms.Any(rm => rm.Room!.HotelId == selectedHotelId))
+            .ToListAsync();
+        todayArrivalsCount = todayArrivals.Count;
+
+        // Departures (Çıkışlar)
+        todayDepartures = await Db.Reservations
+            .Include(r => r.Guest)
+            .Include(r => r.Rooms).ThenInclude(rm => rm.Room)
+            .Include(r => r.Folio).ThenInclude(f => f!.Payments)
+            .Where(r => r.CheckOut == today && r.Status == ResStatus.CheckedIn && r.Rooms.Any(rm => rm.Room!.HotelId == selectedHotelId))
+            .ToListAsync();
+        todayDeparturesCount = todayDepartures.Count;
+
+        // Housekeeping
+        dirtyRoomsCount = hotelRooms.Count(r => r.Housekeeping == HkStatus.Dirty);
+        cleanRoomsCount = hotelRooms.Count(r => r.Housekeeping == HkStatus.Clean);
+
+        // Revenue (Bugünkü Ciro)
+        var dashStats = await Reports.StatsAsync(selectedHotelId);
+        todayRevenue = inHouse.Sum(r => r.TotalAmount / Math.Max(1, (r.CheckOut - r.CheckIn).Days));
+        if (todayRevenue <= 0) todayRevenue = inHouseRooms * 3200m;
+        adr = inHouseRooms > 0 ? Math.Round(todayRevenue / inHouseRooms, 0) : 3200m;
+
+        try
+        {
+            var risks = await Ml.ScanUpcomingCancellationRisksAsync(Db, selectedHotelId);
+            highRiskCancelCount = risks.Count(r => r.CancelProbability >= 60);
+
+            var fc = await Ai.GenerateOccupancyForecastAsync(7, selectedHotelId);
+            var wk = fc.Where(f => f.Date.DayOfWeek == DayOfWeek.Friday || f.Date.DayOfWeek == DayOfWeek.Saturday).ToList();
+            if (wk.Count > 0) avgWeekendOcc = Math.Round(wk.Average(f => f.PredictedOccupancyPct), 0);
+        }
+        catch { }
+
+        await LoadCalendarMonthDataAsync();
+        loading = false;
+    }
+
+    void OpenAiAssistantFromFab()
+    {
+        showFabActionSheet = false;
+        showAiCopilotSheet = true;
+        if (mobileAiMessages.Count == 0)
+        {
+            mobileAiMessages.Add(new CopilotMessage("assistant", $"Merhaba Patron! Ben **OtelPro AI Copilot**. {currentHotel?.Name} için doluluk, iptal riski, fiyat optimizasyonu ve model eğitimi konularında 7/24 hizmetinizdeyim.", DateTime.Now));
+        }
+    }
+
+    async Task SendMobileAiQuery(string query)
+    {
+        mobileAiInput = query;
+        await SubmitMobileAiQuery();
+    }
+
+    async Task SubmitMobileAiQuery()
+    {
+        if (string.IsNullOrWhiteSpace(mobileAiInput) || isMobileAiThinking) return;
+        var q = mobileAiInput.Trim();
+        mobileAiInput = "";
+
+        mobileAiMessages.Add(new CopilotMessage("user", q, DateTime.Now));
+        isMobileAiThinking = true;
+        StateHasChanged();
+
+        try
+        {
+            var res = await Copilot.ProcessQueryAsync(q, selectedHotelId, "staff");
+            mobileAiMessages.Add(res);
+        }
+        catch (Exception ex)
+        {
+            mobileAiMessages.Add(new CopilotMessage("assistant", $"⚠️ Hata: {ex.Message}", DateTime.Now));
+        }
+        finally
+        {
+            isMobileAiThinking = false;
+            StateHasChanged();
+        }
+    }
+
+    async Task HandleMobileAiKey(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter") await SubmitMobileAiQuery();
+    }
+
+    async Task TrainModelFromMobile()
+    {
+        isTrainingMobile = true;
+        StateHasChanged();
+        await Task.Delay(300);
+        await Ml.TrainCancellationModelAsync(Db, 300);
+        var risks = await Ml.ScanUpcomingCancellationRisksAsync(Db, selectedHotelId);
+        highRiskCancelCount = risks.Count(r => r.CancelProbability >= 60);
+        isTrainingMobile = false;
+        mobileAiMessages.Add(new CopilotMessage("assistant", $"🧠 **FastTree Modeli Başarıyla Eğitildi!**\n• Örnek: {Ml.TrainingSampleCount} rezervasyon\n• Doğruluk: %{Ml.ModelAccuracy}\n• AUC: {Ml.AreaUnderRocCurve}", DateTime.Now));
+        StateHasChanged();
+    }
+
+    void GenerateNotifications()
+    {
+        notifications = new List<MobileNotification>
+        {
+            new("VIP Misafir Girişi", $"{currentHotel?.Name} - Zeynep Kaya (Suit Oda) saat 14:30'da giriş yapacak.", "10 dk önce", "👑", "#38bdf8"),
+            new("Yeni Yüksek Rezervasyon", "Booking.com üzerinden ₺36.400 tutarında 4 gecelik rezervasyon onaylandı.", "25 dk önce", "💰", "#34d399"),
+            new("Teknik Servis Uyarısı", "Oda 202 klima filtre temizliği iş emri açıldı.", "1 saat önce", "🛠️", "#f59e0b"),
+            new("EGM KBS Bildirimi", "Tüm giriş yapan misafirlerin kimlik bildirimleri polise başarıyla iletildi.", "2 saat önce", "🪪", "#8b5cf6")
+        };
+    }
+
+    async Task OnHotelChanged(ChangeEventArgs e)
+    {
+        if (int.TryParse(e.Value?.ToString(), out var newId))
+        {
+            await SelectHotelDirectly(newId);
+        }
+    }
+
+    async Task SelectHotelDirectly(int hotelId)
+    {
+        selectedHotelId = hotelId;
+        await CurrentHotelState.SetHotelAsync(hotelId);
+        showHotelPickerSheet = false;
+        await LoadHotelDataAsync();
+        GenerateNotifications();
+    }
+
+    async Task ToggleRoomStatus(Room r)
+    {
+        if (r.Housekeeping == HkStatus.Dirty)
+        {
+            r.Housekeeping = HkStatus.Clean;
+        }
+        else
+        {
+            r.Housekeeping = HkStatus.Dirty;
+        }
+        await Db.SaveChangesAsync();
+        dirtyRoomsCount = hotelRooms.Count(x => x.Housekeeping == HkStatus.Dirty);
+        cleanRoomsCount = hotelRooms.Count(x => x.Housekeeping == HkStatus.Clean);
+    }
+
+    async Task CheckInReservation(Reservation res)
+    {
+        res.Status = ResStatus.CheckedIn;
+        var rm = res.Rooms.FirstOrDefault()?.Room;
+        if (rm != null)
+        {
+            occupiedRoomIds.Add(rm.Id);
+        }
+        await Db.SaveChangesAsync();
+        await LoadHotelDataAsync();
+    }
+
+    async Task CheckOutReservation(Reservation res)
+    {
+        res.Status = ResStatus.CheckedOut;
+        var rm = res.Rooms.FirstOrDefault()?.Room;
+        if (rm != null)
+        {
+            occupiedRoomIds.Remove(rm.Id);
+            rm.Housekeeping = HkStatus.Dirty;
+        }
+        await Db.SaveChangesAsync();
+        await LoadHotelDataAsync();
+    }
+
+    void OpenQuickBookFromFab() { showFabActionSheet = false; showQuickBookSheet = true; }
+    void OpenQuickRateFromFab() { showFabActionSheet = false; showQuickRateSheet = true; }
+    void OpenMaintenanceFromFab() { showFabActionSheet = false; showMaintenanceSheet = true; }
+
+    async Task ToggleStopSellFromFab()
+    {
+        showFabActionSheet = false;
+        await ToggleStopSellAll();
+    }
+
+    async Task ToggleStopSellAll()
+    {
+        isStopSellActive = !isStopSellActive;
+        foreach (var ch in channels)
+        {
+            ch.IsConnected = !isStopSellActive;
+        }
+        await Db.SaveChangesAsync();
+    }
+
+    async Task ToggleChannel(Channel ch)
+    {
+        ch.IsConnected = !ch.IsConnected;
+        ch.LastSync = DateTime.Now;
+        await Db.SaveChangesAsync();
+    }
+
+    async Task SyncChannelsNow()
+    {
+        loading = true;
+        await Task.Delay(400);
+        foreach (var ch in channels) ch.LastSync = DateTime.Now;
+        await Db.SaveChangesAsync();
+        loading = false;
+    }
+
+    async Task AdjustPrices(decimal factor)
+    {
+        foreach (var rt in hotelRoomTypes)
+        {
+            rt.BasePrice = Math.Round(rt.BasePrice * factor, 0);
+        }
+        await Db.SaveChangesAsync();
+        showQuickRateSheet = false;
+        await LoadHotelDataAsync();
+    }
+
+    async Task SaveQuickReservation()
+    {
+        if (string.IsNullOrWhiteSpace(newResGuestName)) return;
+
+        var guest = new Guest
+        {
+            FirstName = newResGuestName.Trim(),
+            LastName = "",
+            Phone = newResGuestPhone,
+            Nationality = "TR"
+        };
+        Db.Guests.Add(guest);
+        await Db.SaveChangesAsync();
+
+        var selectedRt = hotelRoomTypes.FirstOrDefault(rt => rt.Id == newResRoomTypeId) ?? hotelRoomTypes.FirstOrDefault();
+        var freeRoom = hotelRooms.FirstOrDefault(r => r.RoomTypeId == selectedRt?.Id && !occupiedRoomIds.Contains(r.Id));
+
+        var today = DateTime.Today;
+        var total = (selectedRt?.BasePrice ?? 3000) * newResNights;
+
+        var res = new Reservation
+        {
+            Code = $"MOB{new Random().Next(1000, 9999)}",
+            GuestId = guest.Id,
+            CheckIn = today,
+            CheckOut = today.AddDays(newResNights),
+            Adults = 2,
+            TotalAmount = total,
+            Status = ResStatus.Confirmed,
+            CreatedAt = DateTime.Now
+        };
+
+        if (freeRoom != null)
+        {
+            res.Rooms.Add(new ReservationRoom
+            {
+                RoomTypeId = selectedRt?.Id ?? 1,
+                RoomId = freeRoom.Id,
+                CheckIn = today,
+                CheckOut = today.AddDays(newResNights),
+                NightlyRate = selectedRt?.BasePrice ?? 3000
+            });
+        }
+
+        Db.Reservations.Add(res);
+        await Db.SaveChangesAsync();
+
+        showQuickBookSheet = false;
+        newResGuestName = "";
+        newResGuestPhone = "";
+        await LoadHotelDataAsync();
+    }
+
+    async Task SaveQuickMaintenance()
+    {
+        if (string.IsNullOrWhiteSpace(maintTitle)) return;
+        Db.MaintenanceRequests.Add(new MaintenanceRequest
+        {
+            RoomId = maintRoomId,
+            Title = maintTitle,
+            Priority = Priority.High,
+            Status = WorkStatus.Open,
+            ReportedAt = DateTime.Now,
+            Description = "Patron mobil uygulamasından acil açıldı"
+        });
+        await Db.SaveChangesAsync();
+        showMaintenanceSheet = false;
+        maintTitle = "";
+    }
+
+    void ClearNotifications()
+    {
+        unreadNotificationsCount = 0;
+    }
+
+    static string FormatWhatsApp(string phone)
+    {
+        if (string.IsNullOrWhiteSpace(phone)) return "";
+        var digits = new string(phone.Where(char.IsDigit).ToArray());
+        if (digits.StartsWith("0")) digits = "90" + digits.Substring(1);
+        if (!digits.StartsWith("90") && digits.Length == 10) digits = "90" + digits;
+        return digits;
+    }
+
+    async Task LoadCalendarMonthDataAsync()
+    {
+        var start = calMonth;
+        var end = calMonth.AddMonths(1);
+
+        calMonthResRooms = await Db.ReservationRooms
+            .Include(rr => rr.Room).ThenInclude(rm => rm!.RoomType)
+            .Include(rr => rr.Room).ThenInclude(rm => rm!.Floor)
+            .Include(rr => rr.Reservation).ThenInclude(r => r!.Guest)
+            .Include(rr => rr.Reservation).ThenInclude(r => r!.Folio).ThenInclude(f => f!.Payments)
+            .Include(rr => rr.Reservation).ThenInclude(r => r!.Channel)
+            .Where(rr => rr.RoomId != null
+                && rr.Room!.HotelId == selectedHotelId
+                && rr.Reservation!.Status != ResStatus.Cancelled
+                && rr.Reservation.Status != ResStatus.NoShow
+                && rr.CheckIn < end && rr.CheckOut > start)
+            .ToListAsync();
+
+        RecalculateMonthStats();
+    }
+
+    void RecalculateMonthStats()
+    {
+        int days = calDaysInMonth;
+        int totalPossibleRoomNights = hotelRooms.Count * days;
+        int totalOccupiedRoomNights = 0;
+        decimal totalRev = 0;
+        int maxDayOccupied = -1;
+        DateTime peakDay = calMonth;
+
+        for (int d = 1; d <= days; d++)
+        {
+            var dt = new DateTime(calMonth.Year, calMonth.Month, d);
+            var activeRrs = calMonthResRooms.Where(rr => rr.CheckIn.Date <= dt.Date && rr.CheckOut.Date > dt.Date).ToList();
+            var occCount = activeRrs.Select(rr => rr.RoomId).Distinct().Count();
+            totalOccupiedRoomNights += occCount;
+
+            foreach (var rr in activeRrs)
+            {
+                totalRev += rr.NightlyRate > 0 ? rr.NightlyRate : 3000m;
+            }
+
+            if (occCount > maxDayOccupied)
+            {
+                maxDayOccupied = occCount;
+                peakDay = dt;
+            }
+        }
+
+        calTotalNights = totalOccupiedRoomNights;
+        calAvgOccupancy = totalPossibleRoomNights > 0 ? Math.Round((double)totalOccupiedRoomNights / totalPossibleRoomNights * 100, 1) : 0;
+        calTotalRevenue = totalRev;
+        var peakPct = hotelRooms.Count > 0 ? Math.Round((double)maxDayOccupied / hotelRooms.Count * 100, 0) : 0;
+        calPeakDayInfo = $"{peakDay.ToString("dd MMM", L.Culture)} (%{peakPct})";
+    }
+
+    async Task PrevCalMonth()
+    {
+        calMonth = calMonth.AddMonths(-1);
+        selectedCalDate = new DateTime(calMonth.Year, calMonth.Month, 1);
+        await LoadCalendarMonthDataAsync();
+    }
+
+    async Task NextCalMonth()
+    {
+        calMonth = calMonth.AddMonths(1);
+        selectedCalDate = new DateTime(calMonth.Year, calMonth.Month, 1);
+        await LoadCalendarMonthDataAsync();
+    }
+
+    async Task GoToToday()
+    {
+        calMonth = new DateTime(DateTime.Today.Year, DateTime.Today.Month, 1);
+        selectedCalDate = DateTime.Today;
+        await LoadCalendarMonthDataAsync();
+    }
+
+    void SelectCalendarDay(DateTime dt)
+    {
+        selectedCalDate = dt;
+    }
+
+    void OpenReservationDetailFromCal(Reservation? res)
+    {
+        if (res == null) return;
+        selectedResDetail = res;
+        showResDetailSheet = true;
+    }
+
+    void OpenQuickBookForSelectedDay(int? roomId = null)
+    {
+        if (roomId.HasValue)
+        {
+            var rm = hotelRooms.FirstOrDefault(r => r.Id == roomId.Value);
+            if (rm != null) newResRoomTypeId = rm.RoomTypeId;
+        }
+        showQuickBookSheet = true;
+    }
+
+    async Task DoCheckInFromDetail(Reservation res)
+    {
+        showResDetailSheet = false;
+        await CheckInReservation(res);
+        await LoadCalendarMonthDataAsync();
+    }
+
+    async Task DoCheckOutFromDetail(Reservation res)
+    {
+        showResDetailSheet = false;
+        await CheckOutReservation(res);
+        await LoadCalendarMonthDataAsync();
+    }
+
+    async Task DoCancelFromDetail(Reservation res)
+    {
+        res.Status = ResStatus.Cancelled;
+        await Db.SaveChangesAsync();
+        showResDetailSheet = false;
+        await LoadHotelDataAsync();
+    }
+}

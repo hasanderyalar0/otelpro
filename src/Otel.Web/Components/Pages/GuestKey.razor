@@ -1,0 +1,599 @@
+@page "/guest-key"
+@layout Otel.Web.Components.Layout.PublicLayout
+@inject AppDb Db
+@inject HotelState CurrentHotelState
+@inject IJSRuntime JS
+
+<div class="guest-key-portal">
+    <div class="portal-header-tag">
+        <span>📱 5 YILDIZLI TEMASSIZ MİSAFİR KOKPİTİ</span>
+        <h2>Dijital Mobil Oda Anahtarı & Misafir Konsolu</h2>
+        <p class="muted">
+            Resepsiyon sırası beklemeden cep telefonunuzla oda kapınızı açın, oda servisi isteyin ve Wi-Fi'a tek tıkla bağlanın.
+        </p>
+    </div>
+
+    <!-- Hızlı Rezervasyon / Misafir Değiştirici (Jüri Demosu İçin) -->
+    <div class="guest-picker-bar">
+        <span class="label">👤 Aktif Misafir / Oda Seçimi:</span>
+        <button class="g-pill @(selectedGuestId == 1 ? "active" : "")" @onclick="() => SwitchGuest(1)">
+            👩‍⚕️ Dr. Selin Korkmaz (Oda 204)
+        </button>
+        <button class="g-pill @(selectedGuestId == 2 ? "active" : "")" @onclick="() => SwitchGuest(2)">
+            👨‍💼 James Wilson (Oda 302)
+        </button>
+        <button class="g-pill @(selectedGuestId == 3 ? "active" : "")" @onclick="() => SwitchGuest(3)">
+            🇩🇪 Hans Schneider (Oda 401 VIP)
+        </button>
+    </div>
+
+    <!-- MOBİL TELEFON GÖRÜNÜMÜ KOKPİTİ (SMARTPHONE MOCKUP) -->
+    <div class="mobile-phone-frame">
+        <div class="phone-speaker-notch"></div>
+
+        <!-- Telefon Ekranı -->
+        <div class="phone-screen-inner">
+            <!-- Üst Durum Çubuğu -->
+            <div class="phone-status-bar">
+                <span>09:41</span>
+                <span>📶 5G · %98 🔋</span>
+            </div>
+
+            <!-- Tesis ve Misafir Başlığı -->
+            <div class="phone-hotel-header">
+                <div class="hotel-logo-circle">🏨</div>
+                <div>
+                    <h4>@(CurrentHotelState.SelectedHotel?.Name ?? "Grand Aegean Resort & Spa")</h4>
+                    <span class="room-pill-chip">Oda @currentRoomNum · @currentRoomType</span>
+                </div>
+            </div>
+
+            <div class="phone-scroll-body">
+                <!-- DOKUNMATİK AKILLI DİJİTAL ODA ANAHTARI (NFC / BLE) -->
+                <div class="smart-key-card @(isUnlocking ? "unlocking" : "") @(isUnlocked ? "unlocked" : "")">
+                    <div class="key-top-status">
+                        <span class="pulse-indicator"></span>
+                        <span>@(isUnlocked ? "KAPI AÇIK — HOŞ GELDİNİZ" : (isUnlocking ? "KİLİT AÇILIYOR..." : "KAPININ YANINDASINIZ"))</span>
+                    </div>
+
+                    <button class="digital-key-orb" @onclick="UnlockDoor" disabled="@isUnlocking">
+                        <div class="orb-ring-wave"></div>
+                        <div class="orb-ring-pulse"></div>
+                        <div class="orb-core">
+                            <span class="orb-icon">@(isUnlocked ? "🔓" : "🔑")</span>
+                            <span class="orb-label">@(isUnlocked ? "AÇILDI" : "KAPIYI AÇ")</span>
+                        </div>
+                    </button>
+
+                    <div class="key-bottom-instruction">
+                        @if (isUnlocked)
+                        {
+                            <span style="color:#34d399;font-weight:700">✓ Kilit Açıldı! Kapıyı iterek girebilirsiniz.</span>
+                        }
+                        else
+                        {
+                            <span class="muted">Oda kapısına 1 metre mesafede butona dokunun</span>
+                        }
+                    </div>
+                </div>
+
+                <!-- HIZLI ODA SERVİSİ VE KONFOR KONTROLLERİ -->
+                <div class="phone-controls-section">
+                    <h5>✨ Akıllı Oda Denetimi</h5>
+                    <div class="room-action-grid">
+                        <button class="action-tile @(isDndActive ? "active-dnd" : "")" @onclick="ToggleDnd">
+                            <span class="tile-ico">🛑</span>
+                            <span class="tile-title">Rahatsız Etmeyin</span>
+                            <span class="tile-sub">@(isDndActive ? "AÇIK (DND)" : "KAPALI")</span>
+                        </button>
+                        <button class="action-tile @(isCleanRequested ? "active-clean" : "")" @onclick="RequestCleaning">
+                            <span class="tile-ico">🧹</span>
+                            <span class="tile-title">Odamı Temizleyin</span>
+                            <span class="tile-sub">@(isCleanRequested ? "İletildi ✓" : "Talep Gönder")</span>
+                        </button>
+                        <button class="action-tile" @onclick="CopyWifi">
+                            <span class="tile-ico">📶</span>
+                            <span class="tile-title">Wi-Fi Şifresi</span>
+                            <span class="tile-sub">@(wifiCopied ? "Kopyalandı! ✓" : "OtelPro_VIP")</span>
+                        </button>
+                        <button class="action-tile" @onclick="() => showRoomServiceModal = true">
+                            <span class="tile-ico">🥐</span>
+                            <span class="tile-title">Oda Servisi</span>
+                            <span class="tile-sub">Yiyecek & İçecek</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- DİJİTAL FOLIO VE HIZLI CHECK-OUT -->
+                <div class="phone-checkout-card">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+                        <span style="font-size:0.8rem;color:#94a3b8">Oda Hesabı (Folio):</span>
+                        <b style="color:#2dd4bf;font-size:1.1rem">@Fmt.Money(currentFolioTotal)</b>
+                    </div>
+                    <button class="btn-mobile-checkout" @onclick="DoMobileCheckout">
+                        ⚡ 1-Tıkla Temassız Hızlı Check-out
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ODA SERVİSİ HIZLI SİPARİŞ MODALI -->
+@if (showRoomServiceModal)
+{
+    <div class="modal-backdrop" @onclick="() => showRoomServiceModal = false">
+        <div class="service-modal" @onclick:stopPropagation>
+            <div class="modal-head">
+                <h3>🍽️ Oda Servisi & İkram Siparişi (Oda @currentRoomNum)</h3>
+                <button class="x" @onclick="() => showRoomServiceModal = false">✕</button>
+            </div>
+            <div class="modal-body">
+                <p class="muted" style="font-size:0.85rem">Siparişleriniz 15-20 dakika içinde taze olarak odanıza servis edilecek ve oda hesabınıza yansıtılacaktır.</p>
+
+                <div class="menu-items-list">
+                    <div class="menu-item-row">
+                        <div>
+                            <b>🥐 Paris Usulü Kruvasan & Taze Espresso</b>
+                            <small class="muted" style="display:block">Tereyağlı çıtır kruvasan ve çift shot espresso</small>
+                        </div>
+                        <div style="display:flex;align-items:center;gap:10px">
+                            <span class="m-price">180 ₺</span>
+                            <button class="btn sm primary" @onclick='() => OrderItem("Kruvasan & Espresso", 180)'>＋ Ekle</button>
+                        </div>
+                    </div>
+                    <div class="menu-item-row">
+                        <div>
+                            <b>🍷 Ege Şarap & Gurme Peynir Tabağı</b>
+                            <small class="muted" style="display:block">Ezine, tulum, kurutulmuş meyve ve ceviz ile</small>
+                        </div>
+                        <div style="display:flex;align-items:center;gap:10px">
+                            <span class="m-price">750 ₺</span>
+                            <button class="btn sm primary" @onclick='() => OrderItem("Şarap & Peynir Tabağı", 750)'>＋ Ekle</button>
+                        </div>
+                    </div>
+                    <div class="menu-item-row">
+                        <div>
+                            <b>💧 Ekstra Banyo Havlusu & Yastık</b>
+                            <small class="muted" style="display:block">Anti-alerjik kaz tüyü yastık ve büyük banyo havlusu</small>
+                        </div>
+                        <div style="display:flex;align-items:center;gap:10px">
+                            <span class="m-price" style="color:#34d399">Ücretsiz</span>
+                            <button class="btn sm" @onclick='() => OrderItem("Ekstra Havlu/Yastık", 0)'>＋ Talep Et</button>
+                        </div>
+                    </div>
+                </div>
+
+                @if (!string.IsNullOrEmpty(serviceAlert))
+                {
+                    <div class="alert ok" style="margin-top:14px">@serviceAlert</div>
+                }
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    int selectedGuestId = 1;
+    string currentRoomNum = "204";
+    string currentRoomType = "Panoramik Deniz Manzaralı";
+    decimal currentFolioTotal = 450;
+
+    bool isUnlocking = false;
+    bool isUnlocked = false;
+
+    bool isDndActive = false;
+    bool isCleanRequested = false;
+    bool wifiCopied = false;
+
+    bool showRoomServiceModal = false;
+    string? serviceAlert;
+
+    void SwitchGuest(int guestId)
+    {
+        selectedGuestId = guestId;
+        isUnlocked = false;
+        isDndActive = false;
+        isCleanRequested = false;
+
+        if (guestId == 1)
+        {
+            currentRoomNum = "204";
+            currentRoomType = "Panoramik Deniz Manzaralı";
+            currentFolioTotal = 450;
+        }
+        else if (guestId == 2)
+        {
+            currentRoomNum = "302";
+            currentRoomType = "Geniş Balkonlu Deluxe Oda";
+            currentFolioTotal = 820;
+        }
+        else
+        {
+            currentRoomNum = "401";
+            currentRoomType = "VIP Kral Dairesi Penthouse";
+            currentFolioTotal = 2400;
+        }
+    }
+
+    async Task UnlockDoor()
+    {
+        if (isUnlocking) return;
+
+        isUnlocking = true;
+        isUnlocked = false;
+        StateHasChanged();
+
+        // 1.2 saniyelik Bluetooth & NFC kilit el sıkışma simülasyonu
+        await Task.Delay(1200);
+
+        isUnlocking = false;
+        isUnlocked = true;
+        StateHasChanged();
+
+        // Türkçe kadın asistan sesiyle sesli bildirim
+        _ = JS.InvokeVoidAsync("OtelVoice.speakText", $"Oda {currentRoomNum} kapısının kilidi açıldı. Hoş geldiniz!", "tr-TR");
+
+        // 6 saniye sonra kilit güvenliği için tekrar kilitli duruma geç
+        _ = Task.Run(async () =>
+        {
+            await Task.Delay(6000);
+            isUnlocked = false;
+            await InvokeAsync(StateHasChanged);
+        });
+    }
+
+    void ToggleDnd()
+    {
+        isDndActive = !isDndActive;
+        if (isDndActive) isCleanRequested = false;
+    }
+
+    void RequestCleaning()
+    {
+        isCleanRequested = true;
+        isDndActive = false;
+    }
+
+    async Task CopyWifi()
+    {
+        wifiCopied = true;
+        await Task.Delay(2500);
+        wifiCopied = false;
+    }
+
+    void OrderItem(string item, decimal price)
+    {
+        currentFolioTotal += price;
+        serviceAlert = $"✅ '{item}' siparişiniz alındı! Odanıza servis ediliyor. (+{Fmt.Money(price)})";
+    }
+
+    void DoMobileCheckout()
+    {
+        _ = JS.InvokeVoidAsync("OtelVoice.speakText", $"Oda {currentRoomNum} için hızlı check out işleminiz tamamlandı. Bizi tercih ettiğiniz için teşekkür ederiz!", "tr-TR");
+        currentFolioTotal = 0;
+    }
+}
+
+<style>
+.guest-key-portal {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 24px 20px 80px;
+    text-align: center;
+}
+.portal-header-tag span {
+    display: inline-block;
+    padding: 6px 14px;
+    border-radius: 999px;
+    background: hsla(172, 78%, 52%, 0.12);
+    border: 1px solid hsla(172, 78%, 52%, 0.3);
+    color: #2dd4bf;
+    font-size: 0.8rem;
+    font-weight: 800;
+    margin-bottom: 10px;
+}
+.portal-header-tag h2 {
+    font-size: 2.2rem;
+    margin: 0 0 8px;
+    color: #fff;
+}
+
+.guest-picker-bar {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin: 20px 0 30px;
+}
+.guest-picker-bar .label {
+    font-size: 0.85rem;
+    color: #94a3b8;
+}
+.g-pill {
+    background: #1e293b;
+    border: 1px solid #334155;
+    color: #cbd5e1;
+    padding: 7px 14px;
+    border-radius: 10px;
+    font-size: 0.82rem;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+.g-pill:hover, .g-pill.active {
+    background: #0ea5e9;
+    border-color: #0ea5e9;
+    color: #fff;
+    font-weight: 700;
+}
+
+/* Telefon Çerçevesi (Phone Mockup) */
+.mobile-phone-frame {
+    max-width: 380px;
+    margin: 0 auto;
+    background: #090d16;
+    border: 10px solid #1e293b;
+    border-radius: 46px;
+    box-shadow: 0 25px 60px -15px rgba(0, 0, 0, 0.9), 0 0 0 1px rgba(255, 255, 255, 0.1);
+    overflow: hidden;
+    position: relative;
+    text-align: left;
+}
+.phone-speaker-notch {
+    width: 120px;
+    height: 18px;
+    background: #1e293b;
+    border-radius: 0 0 12px 12px;
+    margin: 0 auto;
+    position: relative;
+    z-index: 10;
+}
+.phone-screen-inner {
+    background: #0f172a;
+    display: flex;
+    flex-direction: column;
+    min-height: 620px;
+}
+.phone-status-bar {
+    display: flex;
+    justify-content: space-between;
+    padding: 6px 20px;
+    font-size: 0.72rem;
+    color: #94a3b8;
+    font-weight: 700;
+}
+
+.phone-hotel-header {
+    padding: 12px 18px;
+    background: #1e293b;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    border-bottom: 1px solid #334155;
+}
+.hotel-logo-circle {
+    width: 38px;
+    height: 38px;
+    background: #0ea5e9;
+    border-radius: 50%;
+    display: grid;
+    place-items: center;
+    font-size: 1.2rem;
+}
+.phone-hotel-header h4 {
+    margin: 0 0 2px;
+    font-size: 0.9rem;
+    color: #fff;
+}
+.room-pill-chip {
+    font-size: 0.72rem;
+    color: #2dd4bf;
+    font-weight: 700;
+}
+
+.phone-scroll-body {
+    padding: 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    flex-grow: 1;
+}
+
+/* DOKUNMATİK AKILLI KİLİT KARTI */
+.smart-key-card {
+    background: linear-gradient(145deg, #1e293b, #0f172a);
+    border: 1px solid #334155;
+    border-radius: 20px;
+    padding: 24px 16px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    position: relative;
+    overflow: hidden;
+    transition: all 0.3s;
+}
+.smart-key-card.unlocked {
+    border-color: #10b981;
+    box-shadow: 0 0 30px rgba(16, 185, 129, 0.3);
+}
+.smart-key-card.unlocking {
+    border-color: #0ea5e9;
+    box-shadow: 0 0 30px rgba(14, 165, 233, 0.4);
+}
+
+.key-top-status {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.75rem;
+    font-weight: 800;
+    color: #94a3b8;
+    letter-spacing: 0.5px;
+    margin-bottom: 18px;
+}
+.pulse-indicator {
+    width: 8px;
+    height: 8px;
+    background: #38bdf8;
+    border-radius: 50%;
+    box-shadow: 0 0 8px #38bdf8;
+}
+
+.digital-key-orb {
+    width: 140px;
+    height: 140px;
+    border-radius: 50%;
+    border: none;
+    background: radial-gradient(circle, #0ea5e9, #0284c7);
+    color: #fff;
+    cursor: pointer;
+    position: relative;
+    display: grid;
+    place-items: center;
+    box-shadow: 0 10px 30px rgba(14, 165, 233, 0.5);
+    transition: all 0.25s;
+}
+.digital-key-orb:hover {
+    transform: scale(1.05);
+}
+.unlocked .digital-key-orb {
+    background: radial-gradient(circle, #10b981, #059669);
+    box-shadow: 0 10px 30px rgba(16, 185, 129, 0.6);
+}
+
+.orb-core {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+.orb-icon {
+    font-size: 2.4rem;
+}
+.orb-label {
+    font-size: 0.78rem;
+    font-weight: 900;
+    letter-spacing: 1px;
+    margin-top: 2px;
+}
+
+.unlocking .orb-ring-pulse {
+    position: absolute;
+    inset: -15px;
+    border-radius: 50%;
+    border: 2px solid #38bdf8;
+    animation: orbPulse 1.2s infinite;
+}
+@@keyframes orbPulse {
+    0% { transform: scale(0.9); opacity: 1; }
+    100% { transform: scale(1.3); opacity: 0; }
+}
+
+.key-bottom-instruction {
+    margin-top: 18px;
+    font-size: 0.75rem;
+}
+
+/* Kontrol Butonları Izgarası */
+.phone-controls-section h5 {
+    margin: 0 0 10px;
+    font-size: 0.8rem;
+    color: #94a3b8;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+.room-action-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+}
+.action-tile {
+    background: #1e293b;
+    border: 1px solid #334155;
+    border-radius: 14px;
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    cursor: pointer;
+    transition: all 0.2s;
+    color: #fff;
+    text-align: left;
+}
+.action-tile:hover {
+    border-color: #38bdf8;
+}
+.tile-ico {
+    font-size: 1.4rem;
+    margin-bottom: 4px;
+}
+.tile-title {
+    font-size: 0.8rem;
+    font-weight: 700;
+}
+.tile-sub {
+    font-size: 0.68rem;
+    color: #94a3b8;
+}
+.active-dnd {
+    border-color: #ef4444 !important;
+    background: rgba(239, 68, 68, 0.15) !important;
+}
+.active-clean {
+    border-color: #10b981 !important;
+    background: rgba(16, 185, 129, 0.15) !important;
+}
+
+.phone-checkout-card {
+    background: rgba(15, 23, 42, 0.9);
+    border: 1px dashed rgba(255, 255, 255, 0.15);
+    border-radius: 14px;
+    padding: 12px;
+}
+.btn-mobile-checkout {
+    width: 100%;
+    background: rgba(239, 68, 68, 0.15);
+    border: 1px solid #ef4444;
+    color: #f87171;
+    padding: 9px;
+    border-radius: 10px;
+    font-size: 0.82rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+.btn-mobile-checkout:hover {
+    background: #ef4444;
+    color: #fff;
+}
+
+/* Sipariş Modalı */
+.service-modal {
+    background: #0f172a;
+    border: 1px solid #334155;
+    border-radius: 18px;
+    max-width: 500px;
+    width: 100%;
+    overflow: hidden;
+    text-align: left;
+}
+.menu-items-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+.menu-item-row {
+    background: #1e293b;
+    border-radius: 10px;
+    padding: 12px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+.m-price {
+    font-weight: 800;
+    color: #2dd4bf;
+    font-size: 0.95rem;
+}
+</style>

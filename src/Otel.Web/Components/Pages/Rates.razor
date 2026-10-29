@@ -1,0 +1,87 @@
+@page "/rates"
+@inject AppDb Db
+
+<div class="page-head">
+    <div>
+        <div style="display:flex;align-items:center;gap:10px">
+            <h1>@L["nav.rates"]</h1>
+            <span class="badge b-ok" style="font-size:0.85rem">🏢 @(CurrentHotelState.SelectedHotel?.Name ?? "Tesis")</span>
+        </div>
+        <p>@(L.Lang == "tr" ? $"{CurrentHotelState.SelectedHotel?.Name} dönemsel ve sezonluk fiyatlandırma politikaları, kampanyalar ve promosyon kodları" : "Seasonal pricing, rate plans, and discount promotions")</p>
+    </div>
+    <div style="display:flex;gap:10px">
+        <a class="btn primary sm" href="/rate-shopper" style="background:linear-gradient(135deg, #d97706, #f59e0b);border:none;color:#fff;font-weight:700">🕵️‍♂️ Rakip Fiyat Casusu & Pazar Radarı</a>
+    </div>
+</div>
+
+<div class="grid g2 mb">
+    <div class="card">
+        <h3>Sezonluk Oda Fiyatları (Seasonal Rates)</h3>
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Sezon</th>
+                        <th>Oda Tipi</th>
+                        <th>Tarihler</th>
+                        <th class="num">Gecelik</th>
+                        <th>Min Gece</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var s in seasons)
+                    {
+                        <tr>
+                            <td><b>@s.Name</b></td>
+                            <td>@s.RoomType?.Name</td>
+                            <td><small>@Fmt.D(s.StartDate) - @Fmt.D(s.EndDate)</small></td>
+                            <td class="num"><b>@Fmt.Money(s.PricePerNight)</b></td>
+                            <td>@s.MinStay Gece</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="card">
+        <h3>Promosyon ve İndirim Kodları</h3>
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Kupon Kodu</th>
+                        <th>Kampanya Adı</th>
+                        <th>İndirim</th>
+                        <th>Geçerlilik</th>
+                        <th>Durum</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var p in promotions)
+                    {
+                        <tr>
+                            <td><span class="badge b-info">@p.Code</span></td>
+                            <td>@p.Name</td>
+                            <td>%@p.DiscountPercent</td>
+                            <td><small>@Fmt.D(p.StartDate) - @Fmt.D(p.EndDate)</small></td>
+                            <td><span class="badge @(p.IsActive ? "b-ok" : "b-muted")">@(p.IsActive ? "Aktif" : "Pasif")</span></td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+@code {
+    List<SeasonalRate> seasons = new();
+    List<Promotion> promotions = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        int hId = CurrentHotelState.SelectedHotelId;
+        seasons = await Db.SeasonalRates.Where(s => s.RoomType!.HotelId == hId).Include(s => s.RoomType).OrderBy(s => s.RoomTypeId).ThenBy(s => s.StartDate).ToListAsync();
+        promotions = await Db.Promotions.OrderBy(p => p.StartDate).ToListAsync();
+    }
+}

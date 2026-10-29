@@ -1,0 +1,169 @@
+@inherits LayoutComponentBase
+@inject AuthService Auth
+@inject NavigationManager Nav
+@inject NearbyService NearbySvc
+@implements IDisposable
+
+@if (!ready)
+{
+    <div style="min-height:100vh;display:grid;place-items:center" class="muted">…</div>
+}
+else if (!Auth.IsAuthenticated)
+{
+    <Login />
+}
+else
+{
+    <div class="shell">
+        <aside class="sidebar">
+            <div class="brand"><div class="brand-logo">🏨</div><div><b>OtelPro</b><small>HOTEL MANAGEMENT</small></div></div>
+            
+            <div class="active-hotel-box">
+                <div class="active-hotel-label">
+                    <span>🏢 @(L.Lang == "tr" ? "YÖNETİLEN OTEL" : "ACTIVE HOTEL")</span>
+                    <span class="active-hotel-badge">@(CurrentHotelState.Hotels.Count) @(L.Lang == "tr" ? "Tesis" : "Hotels")</span>
+                </div>
+                <select class="active-hotel-select" value="@CurrentHotelState.SelectedHotelId" @onchange="OnHotelChange">
+                    @foreach (var h in CurrentHotelState.Hotels)
+                    {
+                        <option value="@h.Id">@h.Name (@h.City)</option>
+                    }
+                </select>
+            </div>
+
+            <div style="margin: 0 4px 12px 4px;">
+                <a class="nav-link" href="/mobile" style="background: linear-gradient(135deg, rgba(14, 165, 233, 0.22), rgba(99, 102, 241, 0.18)); border: 1px solid rgba(14, 165, 233, 0.4); color: #fff; font-weight: 700;">
+                    <span class="ico">📱</span>@(L.Lang == "tr" ? "Patron Mobil Uygulaması" : "Owner Mobile App")
+                </a>
+            </div>
+
+            <div class="nav-sec">@L["sec.operations"]</div>
+            <NavLink class="nav-link" href="/" Match="NavLinkMatch.All"><span class="ico">📊</span>@L["nav.dashboard"]</NavLink>
+            <NavLink class="nav-link" href="/frontdesk"><span class="ico">🛎</span>@L["nav.frontdesk"]</NavLink>
+            <NavLink class="nav-link" href="/reservations"><span class="ico">📋</span>@L["nav.reservations"]</NavLink>
+            <NavLink class="nav-link" href="/calendar"><span class="ico">🗓</span>@L["nav.calendar"]</NavLink>
+            <NavLink class="nav-link" href="/rooms"><span class="ico">🚪</span>@L["nav.rooms"]</NavLink>
+            <NavLink class="nav-link" href="/guests"><span class="ico">👥</span>@L["nav.guests"]</NavLink>
+            <NavLink class="nav-link" href="/nearby"><span class="ico">🌴</span>@L["nav.nearby"]</NavLink>
+            <NavLink class="nav-link" href="/housekeeping"><span class="ico">🧹</span>@L["nav.housekeeping"]</NavLink>
+            <NavLink class="nav-link" href="/maintenance"><span class="ico">🛠</span>@L["nav.maintenance"]</NavLink>
+            <div class="nav-sec">@L["sec.sales"]</div>
+            <NavLink class="nav-link" href="/channels"><span class="ico">🌐</span>@L["nav.channels"]</NavLink>
+            <NavLink class="nav-link" href="/rates"><span class="ico">💶</span>@L["nav.rates"]</NavLink>
+            <NavLink class="nav-link" href="/ai-intelligence"><span class="ico">🤖</span>@(L.Lang == "tr" ? "Yapay Zeka & Tahmin" : "AI Intelligence")</NavLink>
+            <NavLink class="nav-link" href="/messages"><span class="ico">💬</span>@L["nav.messages"]</NavLink>
+            <a class="nav-link" href="/book" target="_blank"><span class="ico">🔗</span>@L["nav.booking"]</a>
+            <div class="nav-sec" style="color:#38bdf8;font-weight:800;letter-spacing:0.5px;display:flex;align-items:center;gap:6px">
+                <span>🚀</span> @(L.Lang == "tr" ? "AR-GE & İLERİ TEKNOLOJİ" : "R&D & DEEP TECH")
+            </div>
+            <NavLink class="nav-link" href="/digital-twin" style="border-left:2px solid #06b6d4">
+                <span class="ico">👁️</span>@(L.Lang == "tr" ? "3D Kat Planı Dijital İkiz" : "3D Digital Twin Map")
+            </NavLink>
+            <NavLink class="nav-link" href="/face-checkin" style="border-left:2px solid #a855f7">
+                <span class="ico">📸</span>@(L.Lang == "tr" ? "Biyometrik Yüz Check-in" : "Face ID Kiosk Check-in")
+            </NavLink>
+            <NavLink class="nav-link" href="/rate-shopper" style="border-left:2px solid #f59e0b">
+                <span class="ico">🕵️‍♂️</span>@(L.Lang == "tr" ? "Rakip Otel Fiyat Casusu" : "Rate Shopper Radar")
+            </NavLink>
+            <a class="nav-link" href="/guest-key" target="_blank" style="border-left:2px solid #ec4899">
+                <span class="ico">📱</span>@(L.Lang == "tr" ? "Misafir Mobil Anahtar" : "Guest Mobile Key") ↗
+            </a>
+            <NavLink class="nav-link" href="/trip-planner" style="border-left:2px solid #8b5cf6">
+                <span class="ico">🗺️</span>@(L.Lang == "tr" ? "AI Gezi Rehberi & Rota" : "AI Trip Planner")
+            </NavLink>
+            <NavLink class="nav-link" href="/yield-radar" style="border-left:2px solid #38bdf8">
+                <span class="ico">📈</span>@(L.Lang == "tr" ? "Uçuş & Etkinlik Gelir Radarı" : "Yield Surge Radar")
+            </NavLink>
+
+            <div class="nav-sec">@L["sec.back"]</div>
+            <NavLink class="nav-link" href="/accounting"><span class="ico">🧾</span>@L["nav.accounting"]</NavLink>
+            <NavLink class="nav-link" href="/stock"><span class="ico">📦</span>@L["nav.stock"]</NavLink>
+            <NavLink class="nav-link" href="/kbs"><span class="ico">🪪</span>@L["nav.kbs"]</NavLink>
+            <NavLink class="nav-link" href="/reports"><span class="ico">📈</span>@L["nav.reports"]</NavLink>
+            <NavLink class="nav-link" href="/staff"><span class="ico">🧑‍💼</span>@L["nav.staff"]</NavLink>
+            <NavLink class="nav-link" href="/jobs"><span class="ico">💼</span>@(L.Lang == "tr" ? "Kariyer & Personel" : "Jobs & Staffing")</NavLink>
+            <NavLink class="nav-link" href="/pricing"><span class="ico">💳</span>@(L.Lang == "tr" ? "Oda Bazlı Fiyatlandırma" : "Room Pricing & Plans")</NavLink>
+            @if (Auth.InRole(AppRole.Manager))
+            {
+                <div class="nav-sec">@L["sec.system"]</div>
+                <NavLink class="nav-link" href="/admin"><span class="ico">⚙</span>@L["nav.admin"]</NavLink>
+            }
+        </aside>
+        <div class="main">
+            <header class="topbar">
+                <div class="topbar-hotel-chip" title="Aktif Yönetilen Tesis">
+                    <span class="hotel-dot">●</span>
+                    <b>@(CurrentHotelState.SelectedHotel?.Name ?? "Tesis Seçiniz")</b>
+                    <small class="muted">@(CurrentHotelState.SelectedHotel?.City ?? "")</small>
+                </div>
+                <div style="display:flex;align-items:center;gap:6px;margin-left:10px;flex-wrap:wrap">
+                    <a class="btn sm" href="/trip-planner" style="font-size:0.78rem;background:linear-gradient(135deg, #6366f1, #8b5cf6);border:none;color:#fff;font-weight:700">🗺️ Gezi AI</a>
+                    <a class="btn sm" href="/digital-twin" style="font-size:0.78rem;background:linear-gradient(135deg, #0284c7, #06b6d4);border:none;color:#fff;font-weight:700">👁️ 3D İkiz</a>
+                    <a class="btn sm" href="/face-checkin" style="font-size:0.78rem;background:linear-gradient(135deg, #7c3aed, #c026d3);border:none;color:#fff;font-weight:700">📸 Yüz Tanıma</a>
+                    <a class="btn sm" href="/guest-key" target="_blank" style="font-size:0.78rem;background:linear-gradient(135deg, #059669, #10b981);border:none;color:#fff;font-weight:700">📱 Mobil Anahtar</a>
+                    <a class="btn sm" href="/mobile" style="font-size:0.78rem;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.15);color:#fff">📱 Patron</a>
+                    <a class="btn sm" href="/book" target="_blank" style="font-size:0.78rem">🛎️ Rezervasyon</a>
+                </div>
+                <span class="spacer"></span>
+                <span class="muted" style="font-size:0.85rem">@DateTime.Now.ToString("dddd, d MMMM yyyy", L.Culture)</span>
+                <div class="lang">
+                    <button class="@(L.Lang=="tr"?"on":"")" @onclick='() => L.SetAsync("tr")'>TR</button>
+                    <button class="@(L.Lang=="en"?"on":"")" @onclick='() => L.SetAsync("en")'>EN</button>
+                </div>
+                <button class="theme-toggle-btn" @onclick="Theme.ToggleThemeAsync" title="@(Theme.IsDark ? (L.Lang == "tr" ? "Açık Temaya Geç" : "Switch to Light Mode") : (L.Lang == "tr" ? "Koyu Temaya Geç" : "Switch to Dark Mode"))">
+                    <span class="theme-ico">@(Theme.IsDark ? "🌙" : "☀️")</span>
+                    <span class="theme-label">@(Theme.IsDark ? (L.Lang == "tr" ? "Koyu" : "Dark") : (L.Lang == "tr" ? "Açık" : "Light"))</span>
+                </button>
+                <div class="user-chip">
+                    <div class="avatar">@Auth.User!.FullName[0]</div>
+                    <div style="line-height:1.15"><div style="font-size:.88rem">@Auth.User.FullName</div><small class="muted">@Auth.User.Role</small></div>
+                </div>
+                <button class="btn sm" @onclick="Logout">⎋ @L["nav.logout"]</button>
+            </header>
+            <main class="page" @key="(Nav.Uri + L.Lang + CurrentHotelState.SelectedHotelId + Theme.CurrentTheme)">@Body</main>
+            <AiCopilotWidget />
+        </div>
+    </div>
+}
+
+@code {
+    bool ready;
+    protected override async Task OnInitializedAsync()
+    {
+        L.Changed += Refresh;
+        Auth.Changed += Refresh;
+        CurrentHotelState.OnChange += Refresh;
+        Theme.Changed += Refresh;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool first)
+    {
+        if (first)
+        {
+            await L.InitAsync();
+            await Auth.InitAsync();
+            await NearbySvc.EnsureInitializedAsync();
+            await CurrentHotelState.InitAsync();
+            await Theme.InitAsync();
+            ready = true;
+            StateHasChanged();
+        }
+    }
+
+    async Task OnHotelChange(ChangeEventArgs e)
+    {
+        if (int.TryParse(e.Value?.ToString(), out var newId))
+        {
+            await CurrentHotelState.SetHotelAsync(newId);
+        }
+    }
+
+    void Refresh() => InvokeAsync(StateHasChanged);
+    async Task Logout() { await Auth.LogoutAsync(); Nav.NavigateTo("/"); }
+    public void Dispose()
+    {
+        L.Changed -= Refresh;
+        Auth.Changed -= Refresh;
+        CurrentHotelState.OnChange -= Refresh;
+    }
+}

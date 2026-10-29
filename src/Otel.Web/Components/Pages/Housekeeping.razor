@@ -1,0 +1,98 @@
+@page "/housekeeping"
+@inject AppDb Db
+
+<div class="page-head">
+    <div>
+        <div style="display:flex;align-items:center;gap:10px">
+            <h1>@L["nav.housekeeping"]</h1>
+            <span class="badge b-ok" style="font-size:0.85rem">🏢 @(CurrentHotelState.SelectedHotel?.Name ?? "Tesis")</span>
+        </div>
+        <p>@(L.Lang == "tr" ? $"{CurrentHotelState.SelectedHotel?.Name} kat hizmetleri, oda temizlik durumları ve görev takibi" : "Housekeeping status, daily cleaning tasks and assignments")</p>
+    </div>
+    <div style="display:flex;gap:10px">
+        <a class="btn primary sm" href="/digital-twin">👁️ 3D Kat Planı</a>
+    </div>
+</div>
+
+<div class="grid g4 mb">
+    <div class="card kpi">
+        <span class="ico">✨</span>
+        <div class="label">Temiz Odalar</div>
+        <div class="val">@rooms.Count(r => r.Housekeeping == HkStatus.Clean)</div>
+        <div class="sub">Satışa hazır</div>
+    </div>
+    <div class="card kpi">
+        <span class="ico">🧹</span>
+        <div class="label">Kirli Odalar</div>
+        <div class="val" style="color:var(--bad)">@rooms.Count(r => r.Housekeeping == HkStatus.Dirty)</div>
+        <div class="sub">Temizlik bekliyor</div>
+    </div>
+    <div class="card kpi">
+        <span class="ico">🧽</span>
+        <div class="label">Temizleniyor</div>
+        <div class="val" style="color:var(--warn)">@rooms.Count(r => r.Housekeeping == HkStatus.Cleaning)</div>
+        <div class="sub">Personel odada</div>
+    </div>
+    <div class="card kpi">
+        <span class="ico">🔍</span>
+        <div class="label">Denetlendi</div>
+        <div class="val" style="color:var(--info)">@rooms.Count(r => r.Housekeeping == HkStatus.Inspected)</div>
+        <div class="sub">Şef onayı aldı</div>
+    </div>
+</div>
+
+<div class="card" style="padding:6px">
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th>Oda No</th>
+                    <th>Kat</th>
+                    <th>Oda Tipi</th>
+                    <th>Mevcut Durum</th>
+                    <th>Hızlı Değiştir</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var r in rooms)
+                {
+                    <tr>
+                        <td><b>@r.Number</b></td>
+                        <td>@r.Floor?.Name</td>
+                        <td>@r.RoomType?.Name</td>
+                        <td><Badge Prefix="hk" Value="@r.Housekeeping.ToString()" /></td>
+                        <td>
+                            <div class="row">
+                                <button class="btn sm" @onclick="() => SetHk(r, HkStatus.Clean)">Temiz</button>
+                                <button class="btn sm" @onclick="() => SetHk(r, HkStatus.Dirty)">Kirli</button>
+                                <button class="btn sm" @onclick="() => SetHk(r, HkStatus.Cleaning)">Temizlikte</button>
+                                <button class="btn sm" @onclick="() => SetHk(r, HkStatus.Inspected)">Kontrol Edildi</button>
+                            </div>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>
+
+@code {
+    List<Room> rooms = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadRooms();
+    }
+
+    async Task LoadRooms()
+    {
+        int hId = CurrentHotelState.SelectedHotelId;
+        rooms = await Db.Rooms.Where(r => r.HotelId == hId).Include(r => r.Floor).Include(r => r.RoomType).OrderBy(r => r.Number).ToListAsync();
+    }
+
+    async Task SetHk(Room r, HkStatus status)
+    {
+        r.Housekeeping = status;
+        await Db.SaveChangesAsync();
+    }
+}

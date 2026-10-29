@@ -1,0 +1,138 @@
+@page "/maintenance"
+@inject AppDb Db
+
+<div class="page-head">
+    <div>
+        <div style="display:flex;align-items:center;gap:10px">
+            <h1>@L["nav.maintenance"]</h1>
+            <span class="badge b-ok" style="font-size:0.85rem">🏢 @(CurrentHotelState.SelectedHotel?.Name ?? "Tesis")</span>
+        </div>
+        <p>@(L.Lang == "tr" ? $"{CurrentHotelState.SelectedHotel?.Name} oda arıza kayıtları, onarım talepleri ve teknik servis iş emri" : "Room maintenance tickets, repair requests and technical work orders")</p>
+    </div>
+    <div class="row">
+        <button class="btn primary sm" @onclick="OpenNewModal">＋ Yeni Arıza Bildir</button>
+    </div>
+</div>
+
+<div class="card" style="padding:6px">
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th>Oda</th>
+                    <th>Arıza Konusu</th>
+                    <th>Öncelik</th>
+                    <th>Açılış Zamanı</th>
+                    <th>Durum</th>
+                    <th>İşlem</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var m in requests)
+                {
+                    <tr>
+                        <td><b>Oda @m.Room?.Number</b></td>
+                        <td>
+                            <div><b>@m.Title</b></div>
+                            <small class="muted">@m.Description</small>
+                        </td>
+                        <td><Badge Prefix="b" Value="@m.Priority.ToString()" /></td>
+                        <td>@Fmt.DT(m.ReportedAt)</td>
+                        <td>
+                            <span class="badge @(m.Status == WorkStatus.Done ? "b-ok" : (m.Status == WorkStatus.InProgress ? "b-warn" : "b-bad"))">
+                                @m.Status
+                            </span>
+                        </td>
+                        <td>
+                            @if (m.Status != WorkStatus.Done)
+                            {
+                                <button class="btn sm ok" @onclick="() => MarkDone(m)">Tamamlandı</button>
+                            }
+                            else
+                            {
+                                <small class="muted">Çözüldü: @m.ResolvedAt?.ToString("dd.MM HH:mm")</small>
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<Modal Show="showModal" ShowChanged="(v) => showModal = v" Title="Yeni Oda Arızası Bildir">
+    <div class="form-grid">
+        <div>
+            <label class="f">Oda No</label>
+            <select @bind="newReq.RoomId">
+                @foreach (var r in rooms)
+                {
+                    <option value="@r.Id">Oda @r.Number (@r.RoomType?.Name)</option>
+                }
+            </select>
+        </div>
+        <div>
+            <label class="f">Öncelik Derecesi</label>
+            <select @bind="newReq.Priority">
+                @foreach (var p in Enum.GetValues<Priority>())
+                {
+                    <option value="@p">@p</option>
+                }
+            </select>
+        </div>
+        <div style="grid-column: 1 / -1">
+            <label class="f">Başlık</label>
+            <input @bind="newReq.Title" placeholder="örn: Klima su akıtıyor, TV kumandası bozuk..." />
+        </div>
+        <div style="grid-column: 1 / -1">
+            <label class="f">Detay Açıklama</label>
+            <textarea rows="2" @bind="newReq.Description"></textarea>
+        </div>
+    </div>
+    <div class="row mt" style="justify-content:flex-end">
+        <button class="btn primary" @onclick="SaveRequest">Kaydet</button>
+    </div>
+</Modal>
+
+@code {
+    List<MaintenanceRequest> requests = new();
+    List<Room> rooms = new();
+    bool showModal;
+    MaintenanceRequest newReq = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        int hId = CurrentHotelState.SelectedHotelId;
+        rooms = await Db.Rooms.Where(r => r.HotelId == hId).OrderBy(r => r.Number).ToListAsync();
+        await LoadData();
+    }
+
+    async Task LoadData()
+    {
+        int hId = CurrentHotelState.SelectedHotelId;
+        requests = await Db.MaintenanceRequests.Where(m => m.Room!.HotelId == hId).Include(m => m.Room).OrderByDescending(m => m.ReportedAt).ToListAsync();
+    }
+
+    void OpenNewModal()
+    {
+        newReq = new MaintenanceRequest { RoomId = rooms.FirstOrDefault()?.Id ?? 0, Priority = Priority.Normal };
+        showModal = true;
+    }
+
+    async Task SaveRequest()
+    {
+        if (string.IsNullOrWhiteSpace(newReq.Title)) return;
+        Db.MaintenanceRequests.Add(newReq);
+        await Db.SaveChangesAsync();
+        showModal = false;
+        await LoadData();
+    }
+
+    async Task MarkDone(MaintenanceRequest m)
+    {
+        m.Status = WorkStatus.Done;
+        m.ResolvedAt = DateTime.Now;
+        await Db.SaveChangesAsync();
+        await LoadData();
+    }
+}

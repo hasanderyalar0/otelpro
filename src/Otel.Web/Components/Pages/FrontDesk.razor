@@ -1,0 +1,211 @@
+@page "/frontdesk"
+@inject AppDb Db
+@inject BookingService Booking
+
+<div class="page-head">
+    <div>
+        <div style="display:flex;align-items:center;gap:10px">
+            <h1>@L["nav.frontdesk"]</h1>
+            <span class="badge b-ok" style="font-size:0.85rem">🏢 @(CurrentHotelState.SelectedHotel?.Name ?? "Tesis")</span>
+        </div>
+        <p>@(L.Lang == "tr" ? $"{CurrentHotelState.SelectedHotel?.Name} oda durumları, doluluk ve anlık misafir yerleşimi" : "Real-time room rack and in-house guest management")</p>
+    </div>
+    <div class="row">
+        <select @bind="floorFilter" @bind:after="FilterRooms" style="width:140px">
+            <option value="0">@L["c.all"] Katlar</option>
+            @foreach (var f in floors)
+            {
+                <option value="@f.Id">@f.Name</option>
+            }
+        </select>
+        <select @bind="statusFilter" @bind:after="FilterRooms" style="width:160px">
+            <option value="">@L["c.all"] Durumlar</option>
+            <option value="free">Boş Odalar</option>
+            <option value="occ">Dolu Odalar</option>
+            <option value="dirty">Kirli Odalar</option>
+        </select>
+        <a class="btn sm" href="/digital-twin" style="background:linear-gradient(135deg, #0284c7, #06b6d4);border:none;color:#fff;font-weight:700">👁️ 3D Kat Planı</a>
+        <a class="btn sm" href="/face-checkin" style="background:linear-gradient(135deg, #7c3aed, #a855f7);border:none;color:#fff;font-weight:700">📸 Yüz Kiosku</a>
+    </div>
+</div>
+
+<div class="room-grid">
+    @foreach (var r in filteredRooms)
+    {
+        var isOcc = activeRooms.ContainsKey(r.Id);
+        var activeRes = isOcc ? activeRooms[r.Id] : null;
+        var cls = isOcc ? "occ" : (r.Status == RoomStatus.OutOfOrder ? "ooo" : "free");
+
+        <div class="room @cls" @onclick="() => SelectRoom(r, activeRes)">
+            <div class="row" style="justify-content:space-between">
+                <span class="num">@r.Number</span>
+                <Badge Prefix="hk" Value="@r.Housekeeping.ToString()" />
+            </div>
+            <div class="type">@r.RoomType?.Name</div>
+
+            @if (isOcc && activeRes != null)
+            {
+                <div class="guest">👤 @activeRes.Guest?.FullName</div>
+                <div class="muted" style="font-size:0.75rem;margin-top:2px">
+                    Çıkış: @Fmt.D(activeRes.CheckOut)
+                </div>
+            }
+            else
+            {
+                <div class="muted" style="font-size:0.75rem;margin-top:6px">
+                    @Fmt.Money(r.RoomType?.BasePrice ?? 0) / gece
+                </div>
+            }
+        </div>
+    }
+</div>
+
+<Modal Show="showRoomModal" ShowChanged="(v) => showRoomModal = v" Title="@(selectedRoom != null ? $"Oda {selectedRoom.Number} Detayı" : "")">
+    @if (selectedRoom != null)
+    {
+        <div class="grid g2 mb">
+            <div>
+                <label class="f">Oda Tipi</label>
+                <b>@selectedRoom.RoomType?.Name</b>
+            </div>
+            <div>
+                <label class="f">Kat</label>
+                <b>@selectedRoom.Floor?.Name</b>
+            </div>
+            <div>
+                <label class="f">Housekeeping Durumu</label>
+                <select @bind="selectedRoom.Housekeeping" @bind:after="UpdateHkStatus">
+                    @foreach (var hk in Enum.GetValues<HkStatus>())
+                    {
+                        <option value="@hk">@L["hk." + hk]</option>
+                    }
+                </select>
+            </div>
+            <div>
+                <label class="f">Oda Durumu</label>
+                <select @bind="selectedRoom.Status" @bind:after="UpdateRoomStatus">
+                    @foreach (var st in Enum.GetValues<RoomStatus>())
+                    {
+                        <option value="@st">@L["room." + st]</option>
+                    }
+                </select>
+            </div>
+        </div>
+
+        @if (selectedRes != null)
+        {
+            <div class="card mt">
+                <h3>Aktif Konaklama: @selectedRes.Code</h3>
+                <div class="grid g2">
+                    <div>
+                        <label class="f">Misafir</label>
+                        <div>@selectedRes.Guest?.FullName</div>
+                        <div class="muted" style="font-size:0.8rem">Tel: @selectedRes.Guest?.Phone</div>
+                    </div>
+                    <div>
+                        <label class="f">Tarihler</label>
+                        <div>@Fmt.D(selectedRes.CheckIn) - @Fmt.D(selectedRes.CheckOut)</div>
+                    </div>
+                </div>
+                <div class="row mt" style="justify-content:flex-end">
+                    <button class="btn sm primary" @onclick="() => OpenRes(selectedRes.Id)">Rezervasyon Kartını Aç</button>
+                </div>
+            </div>
+        }
+        else
+        {
+            <div class="alert info mt">
+                Bu oda şu anda boş. Yeni rezervasyon açmak için Yeni Rezervasyon sayfasını kullanabilirsiniz.
+            </div>
+        }
+    }
+</Modal>
+
+<ReservationDetail Id="resDetailId" @bind-Show="showResDetail" OnChanged="LoadData" />
+
+@code {
+    List<Room> allRooms = new();
+    List<Room> filteredRooms = new();
+    List<Floor> floors = new();
+    Dictionary<int, Reservation> activeRooms = new();
+    int floorFilter = 0;
+    string statusFilter = "";
+
+    Room? selectedRoom;
+    Reservation? selectedRes;
+    bool showRoomModal;
+    int resDetailId;
+    bool showResDetail;
+
+    protected override async Task OnInitializedAsync()
+    {
+        int hId = CurrentHotelState.SelectedHotelId;
+        floors = await Db.Floors.Where(f => f.HotelId == hId).AsNoTracking().ToListAsync();
+        await LoadData();
+    }
+
+    async Task LoadData()
+    {
+        int hId = CurrentHotelState.SelectedHotelId;
+        allRooms = await Db.Rooms.Where(r => r.HotelId == hId).Include(r => r.RoomType).Include(r => r.Floor).OrderBy(r => r.Number).ToListAsync();
+
+        var today = DateTime.Today;
+        var inHouse = await Db.Reservations
+            .Include(r => r.Guest)
+            .Include(r => r.Rooms)
+            .Where(r => r.Status == ResStatus.CheckedIn && r.Rooms.Any(rm => rm.Room!.HotelId == hId))
+            .ToListAsync();
+
+        activeRooms.Clear();
+        foreach (var r in inHouse)
+        {
+            foreach (var rr in r.Rooms.Where(x => x.RoomId != null))
+            {
+                activeRooms[rr.RoomId!.Value] = r;
+            }
+        }
+
+        FilterRooms();
+    }
+
+    void FilterRooms()
+    {
+        filteredRooms = allRooms.Where(r =>
+            (floorFilter == 0 || r.FloorId == floorFilter) &&
+            (statusFilter == "" ||
+             (statusFilter == "free" && !activeRooms.ContainsKey(r.Id) && r.Status == RoomStatus.Available) ||
+             (statusFilter == "occ" && activeRooms.ContainsKey(r.Id)) ||
+             (statusFilter == "dirty" && r.Housekeeping == HkStatus.Dirty))
+        ).ToList();
+    }
+
+    void SelectRoom(Room r, Reservation? res)
+    {
+        selectedRoom = r;
+        selectedRes = res;
+        showRoomModal = true;
+    }
+
+    async Task UpdateHkStatus()
+    {
+        if (selectedRoom != null)
+        {
+            await Db.SaveChangesAsync();
+        }
+    }
+
+    async Task UpdateRoomStatus()
+    {
+        if (selectedRoom != null)
+        {
+            await Db.SaveChangesAsync();
+        }
+    }
+
+    void OpenRes(int id)
+    {
+        showRoomModal = false;
+        resDetailId = id;
+        showResDetail = true;
+    }
+}

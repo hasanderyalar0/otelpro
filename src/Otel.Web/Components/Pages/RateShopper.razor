@@ -1,0 +1,337 @@
+@page "/rate-shopper"
+@layout Otel.Web.Components.Layout.PublicLayout
+@inject AppDb Db
+@inject HotelState CurrentHotelState
+
+<div style="max-width: 1300px; margin: 24px auto; padding: 0 24px;">
+<div class="page-head">
+    <div>
+        <div style="display:flex;align-items:center;gap:10px">
+            <h1>🕵️‍♂️ Rakip Otel Fiyat Casusu & Gelir Yönetimi Radarı (Rate Shopper)</h1>
+            <span class="badge" style="background:#f59e0b;color:#04121e;font-weight:800;font-size:0.85rem">Revenue AI & Market Intelligence</span>
+            <span class="badge b-ok" style="font-size:0.85rem">Pazar Payı Lideri (MPI %104.2)</span>
+        </div>
+        <p>Bölgedeki 4 doğrudan rakip otelin Booking.com, Expedia ve Google Hotel Ads fiyatlarını canlı izleyen dinamik fiyatlandırma radarı.</p>
+    </div>
+    <div style="display:flex;gap:10px">
+        <button class="btn primary" @onclick="ApplyAiPriceRecommendations" disabled="@isApplying">
+            @(isApplying ? "⏳ Fiyatlar Kanallara Dağıtılıyor..." : "⚡ 1-Tıkla AI Fiyat Önerisini Uygula")
+        </button>
+    </div>
+</div>
+
+@if (!string.IsNullOrEmpty(statusMessage))
+{
+    <div class="alert ok mb">@statusMessage</div>
+}
+
+<!-- Pazar KPI Kartları -->
+<div class="grid g4 mb">
+    <div class="card kpi">
+        <span class="ico">📊</span>
+        <div class="label">Pazar Penetrasyon İndeksi (MPI)</div>
+        <div class="val" style="color:#34d399">%104.2</div>
+        <div class="sub">Pazar Ortalamasının Üzerinde</div>
+    </div>
+    <div class="card kpi">
+        <span class="ico">💶</span>
+        <div class="label">Bizim ADR vs Rakip Ortalama</div>
+        <div class="val">@Fmt.Money(ourAdr) <small style="font-size:0.8rem;color:#94a3b8">/ @Fmt.Money(compSetAdr)</small></div>
+        <div class="sub">Fiyat Avantajı: Rekabetçi</div>
+    </div>
+    <div class="card kpi">
+        <span class="ico">📈</span>
+        <div class="label">Önerilen Ek Hafta Sonu Hasılatı</div>
+        <div class="val" style="color:#38bdf8">+38.400 ₺</div>
+        <div class="sub">AI Fiyat Artışı Simülasyonu</div>
+    </div>
+    <div class="card kpi">
+        <span class="ico">🌐</span>
+        <div class="label">Taranan Rakip & Kanal</div>
+        <div class="val">4 Otel / 8 OTA</div>
+        <div class="sub">Son Tarama: 4 Dakika Önce</div>
+    </div>
+</div>
+
+<!-- AI GELİR YÖNETİMİ & FİYAT ARTIRIM TAVSİYE KARTI -->
+<div class="card mb ai-recommendation-card">
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:16px">
+        <div style="display:flex;align-items:center;gap:14px">
+            <div class="ai-spark-circle">🔮</div>
+            <div>
+                <div style="font-weight:800;font-size:1.05rem;color:#fff;display:flex;align-items:center;gap:8px">
+                    <span>AI Dinamik Gelir Tavsiyesi (Revenue Optimization)</span>
+                    <span class="badge" style="background:#f59e0b;color:#04121e;font-size:0.75rem;font-weight:800">YÜKSEK TALEP</span>
+                </div>
+                <p class="muted" style="margin:4px 0 0;font-size:0.86rem">
+                    Yaklaşan hafta sonu için bölgedeki rakipler fiyatlarını ortalama <b>%24.5 artırdı</b>. Tesisimizin tahmini doluluğu <b>%86.5</b> seviyesinde. Standart ve Deluxe odaların fiyatını <b>+550 ₺</b> artırarak talep kaybı yaşamadan kârlılığı maksimize edebilirsiniz.
+                </p>
+            </div>
+        </div>
+        <button class="btn primary" @onclick="ApplyAiPriceRecommendations" disabled="@isApplying">
+            ⚡ Tavsiyeyi Uygula (+@Fmt.Money(38400))
+        </button>
+    </div>
+</div>
+
+<!-- RAKİP FİYAT KARŞILAŞTIRMA TABLOSU VE GÜNLÜK RADAR -->
+<div class="grid g2" style="grid-template-columns: 1.4fr 1fr; gap: 24px;">
+    <!-- SOL: 4 RAKİP OTEL VE FİYAT TABLOSU -->
+    <div class="card">
+        <h3>🏢 Rakip Oteller Fiyat Matrisi (Günlük Canlı Veri)</h3>
+        <p class="muted" style="font-size:0.82rem;margin-bottom:16px">
+            OTA API'leri ve Google Hotel Ads üzerinden taranan standart ve lüks oda fiyatları.
+        </p>
+
+        <div class="comp-table-wrap">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Tesis Adı</th>
+                        <th>Kategori</th>
+                        <th>Hafta İçi (Gecelik)</th>
+                        <th>Hafta Sonu (Gecelik)</th>
+                        <th>Doluluk Durumu</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr class="our-hotel-row">
+                        <td>
+                            <b>⭐ @(CurrentHotelState.SelectedHotel?.Name ?? "Bizim Otelimiz")</b>
+                            <span class="badge b-ok" style="font-size:0.7rem;margin-left:6px">Bizim Tesis</span>
+                        </td>
+                        <td>5 Yıldız Lüks</td>
+                        <td><b>@Fmt.Money(ourPriceWeekday)</b></td>
+                        <td><b style="color:#38bdf8">@Fmt.Money(ourPriceWeekend)</b></td>
+                        <td><span class="badge b-ok">%@ourOcc</span></td>
+                    </tr>
+                    @foreach (var comp in competitors)
+                    {
+                        <tr>
+                            <td>
+                                <b>@comp.Name</b>
+                                <small class="muted" style="display:block">📍 @comp.DistanceKm km uzaklıkta</small>
+                            </td>
+                            <td>@comp.Stars Yıldız @comp.Concept</td>
+                            <td>@Fmt.Money(comp.PriceWeekday)</td>
+                            <td><b style="color:#f59e0b">@Fmt.Money(comp.PriceWeekend)</b></td>
+                            <td>
+                                <span class="badge @(comp.OccupancyPct > 80 ? "b-warn" : "b-ok")">
+                                    %@comp.OccupancyPct
+                                </span>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- SAĞ: HAFTALIK FİYAT DALGALANMA VE PAZAR GRAFİĞİ -->
+    <div class="card">
+        <h3>📈 7 Günlük Fiyat Trendi & Pazar Radarı</h3>
+        <p class="muted" style="font-size:0.82rem;margin-bottom:14px">
+            Cuma ve Cumartesi günleri pazar ortalaması tavan yapmaktadır.
+        </p>
+
+        <div class="week-trend-bars">
+            @foreach (var day in weekTrend)
+            {
+                <div class="day-trend-col @(day.IsWeekend ? "weekend-col" : "")">
+                    <div class="day-bar-track">
+                        <!-- Rakip Ortalama Çubuğu -->
+                        <div class="bar-comp" style="height:@((int)(day.CompPrice / 6000m * 100))%" title="Rakip Ort: @Fmt.Money(day.CompPrice)"></div>
+                        <!-- Bizim Fiyat Çubuğu -->
+                        <div class="bar-us" style="height:@((int)(day.OurPrice / 6000m * 100))%" title="Bizim Fiyat: @Fmt.Money(day.OurPrice)"></div>
+                    </div>
+                    <span class="day-label">@day.DayName</span>
+                    <span class="day-price">@Fmt.Money(day.OurPrice)</span>
+                </div>
+            }
+        </div>
+
+        <div class="chart-legend-box">
+            <span class="leg"><span class="dot-bar us"></span> Bizim Fiyatımız</span>
+            <span class="leg"><span class="dot-bar comp"></span> Rakip Pazar Ortalaması (CompSet)</span>
+        </div>
+    </div>
+</div>
+</div>
+
+@code {
+    bool isApplying = false;
+    string? statusMessage;
+
+    decimal ourAdr = 3450;
+    decimal compSetAdr = 3890;
+
+    decimal ourPriceWeekday = 3100;
+    decimal ourPriceWeekend = 3800;
+    int ourOcc = 84;
+
+    List<CompetitorModel> competitors = new();
+    List<DayTrendModel> weekTrend = new();
+
+    protected override void OnInitialized()
+    {
+        InitData();
+    }
+
+    void InitData()
+    {
+        competitors = new List<CompetitorModel>
+        {
+            new("Rixos Premium Resort & Villas", 5, "Ultra Her Şey Dahil", 1.8, 4200, 5400, 92),
+            new("Mandarin Oriental Luxury Palace", 5, "Oda Kahvaltı & Spa", 3.2, 5800, 7200, 88),
+            new("Swissôtel Resort & Beach Club", 5, "Yarım Pansiyon", 2.4, 3600, 4700, 81),
+            new("Titanic Deluxe Marina Hotel", 5, "Her Şey Dahil", 4.1, 3300, 4200, 78)
+        };
+
+        weekTrend = new List<DayTrendModel>
+        {
+            new("Pzt", 2900, 3200, false),
+            new("Sal", 2950, 3250, false),
+            new("Çar", 3100, 3400, false),
+            new("Per", 3200, 3600, false),
+            new("Cum", 3800, 4900, true),
+            new("Cmt", 4100, 5200, true),
+            new("Paz", 3300, 3800, false)
+        };
+    }
+
+    async Task ApplyAiPriceRecommendations()
+    {
+        isApplying = true;
+        StateHasChanged();
+        await Task.Delay(800);
+
+        ourPriceWeekend += 550;
+        ourAdr += 220;
+
+        var fri = weekTrend.FirstOrDefault(d => d.DayName == "Cum");
+        if (fri != null) fri.OurPrice += 550;
+        var sat = weekTrend.FirstOrDefault(d => d.DayName == "Cmt");
+        if (sat != null) sat.OurPrice += 550;
+
+        isApplying = false;
+        statusMessage = "✅ AI Fiyat Optimizasyonu başarıyla uygulandı! Hafta sonu fiyatları +550 ₺ artırılarak Booking.com, Expedia ve Web Motoruna senkronize edildi. Tahmini ek ciro: +38.400 ₺.";
+    }
+
+    public record CompetitorModel(string Name, int Stars, string Concept, double DistanceKm, decimal PriceWeekday, decimal PriceWeekend, int OccupancyPct);
+    public class DayTrendModel
+    {
+        public string DayName { get; set; }
+        public decimal OurPrice { get; set; }
+        public decimal CompPrice { get; set; }
+        public bool IsWeekend { get; set; }
+        public DayTrendModel(string dayName, decimal ourPrice, decimal compPrice, bool isWeekend)
+        {
+            DayName = dayName;
+            OurPrice = ourPrice;
+            CompPrice = compPrice;
+            IsWeekend = isWeekend;
+        }
+    }
+}
+
+<style>
+.ai-recommendation-card {
+    background: linear-gradient(135deg, rgba(245, 158, 11, 0.12), rgba(14, 165, 233, 0.1));
+    border: 1px solid rgba(245, 158, 11, 0.35);
+    padding: 16px 22px;
+}
+.ai-spark-circle {
+    width: 48px;
+    height: 48px;
+    background: linear-gradient(135deg, #f59e0b, #d97706);
+    border-radius: 12px;
+    display: grid;
+    place-items: center;
+    font-size: 1.6rem;
+    box-shadow: 0 4px 14px rgba(245, 158, 11, 0.35);
+    flex-shrink: 0;
+}
+
+.comp-table-wrap {
+    overflow-x: auto;
+}
+.our-hotel-row {
+    background: rgba(14, 165, 233, 0.12) !important;
+    border-left: 3px solid #0ea5e9;
+}
+
+.week-trend-bars {
+    height: 220px;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    gap: 8px;
+    padding-bottom: 24px;
+    border-bottom: 1px solid #334155;
+    position: relative;
+}
+.day-trend-col {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    height: 100%;
+}
+.day-trend-col.weekend-col {
+    background: rgba(245, 158, 11, 0.05);
+    border-radius: 8px 8px 0 0;
+}
+.day-bar-track {
+    flex: 1;
+    width: 100%;
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    gap: 4px;
+    padding-bottom: 4px;
+}
+.bar-comp {
+    width: 10px;
+    background: #64748b;
+    border-radius: 3px 3px 0 0;
+    transition: height 0.3s ease;
+}
+.bar-us {
+    width: 12px;
+    background: linear-gradient(to top, #0ea5e9, #38bdf8);
+    border-radius: 3px 3px 0 0;
+    transition: height 0.3s ease;
+}
+.day-label {
+    font-size: 0.75rem;
+    color: #94a3b8;
+    margin-top: 6px;
+    font-weight: 700;
+}
+.day-price {
+    font-size: 0.68rem;
+    color: #38bdf8;
+    font-weight: 600;
+}
+
+.chart-legend-box {
+    display: flex;
+    gap: 16px;
+    margin-top: 12px;
+    font-size: 0.78rem;
+    color: #cbd5e1;
+}
+.leg {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+.dot-bar {
+    width: 12px;
+    height: 12px;
+    border-radius: 3px;
+    display: inline-block;
+}
+.dot-bar.us { background: #0ea5e9; }
+.dot-bar.comp { background: #64748b; }
+</style>

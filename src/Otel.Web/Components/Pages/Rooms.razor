@@ -1,0 +1,374 @@
+@page "/rooms"
+@inject AppDb Db
+@inject HotelState CurrentHotelState
+
+<div class="page-head">
+    <div>
+        <div style="display:flex;align-items:center;gap:10px">
+            <h1>@L["nav.rooms"] & Akıllı IoT Enerji</h1>
+            <span class="badge b-ok" style="font-size:0.85rem">🏢 @(CurrentHotelState.SelectedHotel?.Name ?? "Tesis")</span>
+        </div>
+        <p>@(L.Lang == "tr" ? $"{CurrentHotelState.SelectedHotel?.Name} odaları, kat yerleşimleri, fotoğraflı oda kataloğu ve Akıllı Oda (IoT) Yeşil Enerji Tasarruf Paneli" : "Rooms catalogue, floor assignments and Smart IoT Green Energy dashboard")</p>
+    </div>
+    <div style="display:flex;gap:10px">
+        <a class="btn sm" href="/digital-twin" style="background:linear-gradient(135deg, #0284c7, #06b6d4);border:none;color:#fff;font-weight:700">👁️ 3D Kat Planı (Bina İkizi)</a>
+        <a class="btn primary sm" href="/book" target="_blank">🛎️ Müşteri Rezervasyon Ekranını Aç</a>
+    </div>
+</div>
+
+@if (!string.IsNullOrEmpty(iotAlert))
+{
+    <div class="alert ok mb" style="display:flex;justify-content:space-between;align-items:center">
+        <span>@iotAlert</span>
+        <button class="btn sm" style="padding:2px 8px;font-size:0.75rem" @onclick="() => iotAlert = null">✕</button>
+    </div>
+}
+
+<!-- Sekmeler -->
+<div class="tabs mb">
+    <button class="@(activeTab == "rooms" ? "on" : "")" @onclick='() => activeTab = "rooms"'>
+        🚪 Odalar & Kat Kataloğu (@rooms.Count)
+    </button>
+    <button class="@(activeTab == "iot" ? "on" : "")" @onclick='() => activeTab = "iot"'>
+        🌱 Akıllı Oda & IoT Yeşil Enerji Paneli (Eco-Smart Hotel)
+    </button>
+</div>
+
+@if (activeTab == "rooms")
+{
+    <!-- Fotoğraflı Oda Tipleri Galerisi (Görsel Zenginlik) -->
+    <div class="room-types-gallery-grid mb">
+        @foreach (var rt in roomTypes)
+        {
+            <div class="rt-mini-card">
+                <div class="rt-img-box">
+                    <img src="@GetRoomImage(rt.Name)" alt="@rt.Name" class="rt-img" />
+                    <span class="rt-badge-capacity">👥 @rt.MaxCapacity Kişilik</span>
+                </div>
+                <div class="rt-info">
+                    <h4>@rt.Name</h4>
+                    <div class="rt-meta">
+                        <span>📐 @rt.AreaM2 m²</span> · <span>🛏️ @rt.BedType</span>
+                    </div>
+                    <div class="rt-price">@Fmt.Money(rt.BasePrice) <small>/gece taban</small></div>
+                </div>
+            </div>
+        }
+    </div>
+
+    <!-- Filtreleme Butonları -->
+    <div class="card mb" style="padding:12px 18px">
+        <div class="row" style="gap:10px;align-items:center;flex-wrap:wrap">
+            <span class="muted" style="font-size:0.85rem;font-weight:600">Oda Filtresi:</span>
+            <button class="btn sm @(statusFilter == null ? "primary" : "")" @onclick="() => statusFilter = null">Tüm Odalar (@rooms.Count)</button>
+            <button class="btn sm @(statusFilter == "Available" ? "primary" : "")" @onclick='() => statusFilter = "Available"'>🟢 Müsait</button>
+            <button class="btn sm @(statusFilter == "Clean" ? "primary" : "")" @onclick='() => statusFilter = "Clean"'>✨ Temiz</button>
+            <button class="btn sm @(statusFilter == "Dirty" ? "primary" : "")" @onclick='() => statusFilter = "Dirty"'>🧹 Temizlik Bekleyen</button>
+
+            <span class="spacer"></span>
+            <input type="text" placeholder="Oda no veya tip ara..." style="max-width:220px;padding:6px 12px;font-size:0.85rem" @bind="searchQuery" @bind:event="oninput" />
+        </div>
+    </div>
+
+    <!-- Oda Grid Listesi -->
+    <div class="grid g4 mb">
+        @foreach (var r in filteredRooms)
+        {
+            <div class="card room-card">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+                    <span class="room-number">Oda @r.Number</span>
+                    <span class="badge @(r.Status == RoomStatus.Available ? "b-ok" : "b-bad")">
+                        @(r.Status == RoomStatus.Available ? "Müsait" : "Dolu")
+                    </span>
+                </div>
+                <div class="room-type-title">@(r.RoomType?.Name ?? "Standart")</div>
+                <div class="room-details-text">
+                    <span>Kat @(r.Floor?.Number ?? 1)</span> · 
+                    <span style="color:@(r.Housekeeping == HkStatus.Clean ? "#22c55e" : "#f43f5e")">
+                        @(r.Housekeeping == HkStatus.Clean ? "✨ Temiz" : "🧹 Kirli")
+                    </span>
+                </div>
+            </div>
+        }
+    </div>
+}
+else
+{
+    <!-- TAB 2: AKILLI ODA & IOT YEŞİL ENERJİ PANELİ -->
+    <div class="grid g4 mb">
+        <div class="card kpi">
+            <span class="ico">🌿</span>
+            <div class="label">Aylık Enerji Tasarrufu</div>
+            <div class="val" style="color:#22c55e">%24.8</div>
+            <div class="sub">14.280 kWh Elektrik</div>
+        </div>
+        <div class="card kpi">
+            <span class="ico">💰</span>
+            <div class="label">Maddi Tasarruf</div>
+            <div class="val" style="color:#38bdf8">57.120 ₺</div>
+            <div class="sub">Bu Ay Faturaya Yansıyan</div>
+        </div>
+        <div class="card kpi">
+            <span class="ico">🌍</span>
+            <div class="label">Azaltılan Karbon Ayak İzi</div>
+            <div class="val" style="color:#a855f7">6.4 Ton</div>
+            <div class="sub">CO₂ Salınım Tasarrufu</div>
+        </div>
+        <div class="card kpi">
+            <span class="ico">📡</span>
+            <div class="label">Çevrimiçi IoT Sensör</div>
+            <div class="val" style="color:#f59e0b">48 / 48</div>
+            <div class="sub">Zigbee & LoRaWAN Aktif</div>
+        </div>
+    </div>
+
+    <div class="card mb" style="background:rgba(2,132,199,0.08);border:1px solid rgba(56,189,248,0.35);padding:14px 18px">
+        <div style="display:flex;align-items:center;gap:10px">
+            <span style="font-size:1.6rem">🤖</span>
+            <div>
+                <b style="color:#fff;font-size:0.95rem">Yapay Zeka Otomatik Enerji Kural Motoru Aktif</b>
+                <p style="margin:2px 0 0;font-size:0.82rem;color:#cbd5e1">
+                    Misafir balkon kapısını açtığında klima otomatik olarak <b>Eco Tasarruf Moduna</b> geçer. Odada 20 dakika varlık algılanmadığında aydınlatmalar kapatılır ve klima uyku moduna (26°C) alınır.
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <!-- İnteraktif IoT Odalar Listesi -->
+    <div class="grid g3 mb">
+        @foreach (var iot in iotRooms)
+        {
+            <div class="card" style="border:1px solid @(iot.BalconyDoorOpen ? "#f59e0b" : "rgba(255,255,255,0.1)")">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+                    <div style="display:flex;align-items:center;gap:8px">
+                        <span style="font-size:1.3rem">🚪</span>
+                        <b>Oda @iot.RoomNumber</b>
+                        <small class="muted">(@iot.RoomType)</small>
+                    </div>
+                    <span class="badge @(iot.IsOccupied ? "b-ok" : "b-muted")" style="font-size:0.72rem">
+                        @(iot.IsOccupied ? "🟢 Misafir Odada" : "⚪ Oda Boş")
+                    </span>
+                </div>
+
+                <div style="display:flex;flex-direction:column;gap:6px;font-size:0.85rem;background:rgba(0,0,0,0.3);padding:10px 12px;border-radius:10px;margin-bottom:12px">
+                    <div style="display:flex;justify-content:space-between">
+                        <span class="muted">Balkon Kapısı:</span>
+                        <b style="color:@(iot.BalconyDoorOpen ? "#f59e0b" : "#22c55e")">
+                            @(iot.BalconyDoorOpen ? "⚠️ AÇIK (Sensör Devrede)" : "✓ Kapalı")
+                        </b>
+                    </div>
+                    <div style="display:flex;justify-content:space-between">
+                        <span class="muted">Oda Sıcaklığı:</span>
+                        <b>@iot.CurrentTemp.ToString("0.0") °C</b>
+                    </div>
+                    <div style="display:flex;justify-content:space-between">
+                        <span class="muted">Akıllı Klima Modu:</span>
+                        <b style="color:@(iot.AcMode == "Eco" ? "#22c55e" : (iot.AcMode == "Konfor" ? "#38bdf8" : "#94a3b8"))">
+                            @iot.AcMode (@iot.AcTargetTemp°C)
+                        </b>
+                    </div>
+                    <div style="display:flex;justify-content:space-between">
+                        <span class="muted">Tüketim İvmesi:</span>
+                        <span style="color:@(iot.AcMode == "Eco" ? "#22c55e" : "#f59e0b");font-weight:600">
+                            @(iot.AcMode == "Eco" ? "🍃 0.4 kWh (Düşük)" : "⚡ 1.8 kWh (Standart)")
+                        </span>
+                    </div>
+                </div>
+
+                <!-- Simülatör Aksiyon Butonları -->
+                <div style="display:flex;gap:6px">
+                    <button class="btn sm" style="flex:1;font-size:0.75rem;padding:5px 8px" @onclick="() => ToggleBalconyDoor(iot)">
+                        @(iot.BalconyDoorOpen ? "🚪 Kapıyı Kapat" : "🚪 Kapıyı Aç")
+                    </button>
+                    <button class="btn sm" style="flex:1;font-size:0.75rem;padding:5px 8px" @onclick="() => ToggleOccupancy(iot)">
+                        @(iot.IsOccupied ? "🚶 Misafir Ayrıldı" : "🚶 Misafir Girdi")
+                    </button>
+                </div>
+            </div>
+        }
+    </div>
+}
+
+<style>
+.room-types-gallery-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 16px;
+}
+.rt-mini-card {
+    background: rgba(30, 41, 59, 0.7);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 16px;
+    overflow: hidden;
+    transition: all 0.25s;
+}
+.rt-mini-card:hover {
+    transform: translateY(-4px);
+    border-color: rgba(56, 189, 248, 0.5);
+    box-shadow: 0 12px 24px rgba(0, 0, 0, 0.5);
+}
+.rt-img-box {
+    position: relative;
+    width: 100%;
+    height: 140px;
+    background: #0f172a;
+}
+.rt-img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+.rt-badge-capacity {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    background: rgba(15, 23, 42, 0.85);
+    backdrop-filter: blur(4px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 20px;
+    padding: 3px 10px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #38bdf8;
+}
+.rt-info {
+    padding: 12px 14px;
+}
+.rt-info h4 {
+    margin: 0 0 4px 0;
+    font-size: 0.95rem;
+    color: #fff;
+}
+.rt-meta {
+    font-size: 0.78rem;
+    color: #94a3b8;
+    margin-bottom: 6px;
+}
+.rt-price {
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: #2dd4bf;
+}
+.rt-price small {
+    font-size: 0.72rem;
+    color: #94a3b8;
+    font-weight: normal;
+}
+.room-card {
+    padding: 14px;
+    transition: all 0.2s;
+}
+.room-card:hover {
+    border-color: #38bdf8;
+    transform: translateY(-2px);
+}
+.room-number {
+    font-size: 1.15rem;
+    font-weight: 700;
+    color: #fff;
+}
+.room-type-title {
+    font-size: 0.88rem;
+    color: #38bdf8;
+    margin-bottom: 4px;
+    font-weight: 500;
+}
+.room-details-text {
+    font-size: 0.78rem;
+    color: #94a3b8;
+}
+</style>
+
+@code {
+    string activeTab = "rooms";
+    string? statusFilter = null;
+    string searchQuery = "";
+    string? iotAlert;
+
+    List<Room> rooms = new();
+    List<RoomType> roomTypes = new();
+
+    class RoomIotState
+    {
+        public string RoomNumber { get; set; } = "";
+        public string RoomType { get; set; } = "";
+        public bool IsOccupied { get; set; } = true;
+        public bool BalconyDoorOpen { get; set; } = false;
+        public double CurrentTemp { get; set; } = 22.4;
+        public string AcMode { get; set; } = "Konfor"; // Konfor, Eco, Kapalı
+        public int AcTargetTemp { get; set; } = 22;
+    }
+
+    List<RoomIotState> iotRooms = new()
+    {
+        new RoomIotState { RoomNumber = "101", RoomType = "Standart Oda", IsOccupied = true, BalconyDoorOpen = false, CurrentTemp = 21.8, AcMode = "Konfor", AcTargetTemp = 22 },
+        new RoomIotState { RoomNumber = "102", RoomType = "Standart Oda", IsOccupied = false, BalconyDoorOpen = false, CurrentTemp = 23.5, AcMode = "Eco", AcTargetTemp = 26 },
+        new RoomIotState { RoomNumber = "201", RoomType = "Deluxe Deniz Manzaralı", IsOccupied = true, BalconyDoorOpen = false, CurrentTemp = 22.0, AcMode = "Konfor", AcTargetTemp = 22 },
+        new RoomIotState { RoomNumber = "202", RoomType = "Deluxe Deniz Manzaralı", IsOccupied = true, BalconyDoorOpen = true, CurrentTemp = 24.2, AcMode = "Eco", AcTargetTemp = 26 },
+        new RoomIotState { RoomNumber = "301", RoomType = "Aile Odası", IsOccupied = true, BalconyDoorOpen = false, CurrentTemp = 22.1, AcMode = "Konfor", AcTargetTemp = 22 },
+        new RoomIotState { RoomNumber = "401", RoomType = "Kral Dairesi / Suit", IsOccupied = false, BalconyDoorOpen = false, CurrentTemp = 24.0, AcMode = "Kapalı", AcTargetTemp = 26 }
+    };
+
+    protected override async Task OnInitializedAsync()
+    {
+        int hId = CurrentHotelState.SelectedHotelId;
+        rooms = await Db.Rooms.Where(r => r.HotelId == hId).Include(r => r.Floor).Include(r => r.RoomType).OrderBy(r => r.Number).ToListAsync();
+        roomTypes = await Db.RoomTypes.Where(rt => rt.HotelId == hId).ToListAsync();
+    }
+
+    IEnumerable<Room> filteredRooms => rooms
+        .Where(r => statusFilter == null ||
+                    (statusFilter == "Available" && r.Status == RoomStatus.Available) ||
+                    (statusFilter == "Clean" && r.Housekeeping == HkStatus.Clean) ||
+                    (statusFilter == "Dirty" && r.Housekeeping == HkStatus.Dirty))
+        .Where(r => string.IsNullOrWhiteSpace(searchQuery) ||
+                    r.Number.Contains(searchQuery, StringComparison.OrdinalIgnoreCase) ||
+                    (r.RoomType != null && r.RoomType.Name.Contains(searchQuery, StringComparison.OrdinalIgnoreCase)));
+
+    void ToggleBalconyDoor(RoomIotState iot)
+    {
+        iot.BalconyDoorOpen = !iot.BalconyDoorOpen;
+        if (iot.BalconyDoorOpen)
+        {
+            iot.AcMode = "Eco";
+            iot.AcTargetTemp = 26;
+            iotAlert = $"🌿 [Oda {iot.RoomNumber} Kuralı Tetiklendi]: Balkon kapısı açıldı. Boşa elektrik tüketimini önlemek için akıllı klima Konfor modundan ECO moduna alındı!";
+        }
+        else
+        {
+            if (iot.IsOccupied)
+            {
+                iot.AcMode = "Konfor";
+                iot.AcTargetTemp = 22;
+                iotAlert = $"❄️ [Oda {iot.RoomNumber}]: Balkon kapısı kapatıldı. Klima otomatik olarak misafirin konfor sıcaklığına (22°C) döndü.";
+            }
+        }
+    }
+
+    void ToggleOccupancy(RoomIotState iot)
+    {
+        iot.IsOccupied = !iot.IsOccupied;
+        if (!iot.IsOccupied)
+        {
+            iot.AcMode = "Eco";
+            iot.AcTargetTemp = 26;
+            iotAlert = $"🍃 [Oda {iot.RoomNumber} Sensörü]: Misafir odadan ayrıldı (Varlık Yok). Aydınlatmalar kapatıldı ve klima bekleme moduna alındı.";
+        }
+        else
+        {
+            iot.AcMode = "Konfor";
+            iot.AcTargetTemp = 22;
+            iotAlert = $"🟢 [Oda {iot.RoomNumber} Sensörü]: Misafir odaya giriş yaptı. Hoş geldiniz karşılama ışıkları ve konfor sıcaklığı (22°C) aktif.";
+        }
+    }
+
+    string GetRoomImage(string name)
+    {
+        var n = (name ?? "").ToLowerInvariant();
+        if (n.Contains("deniz") || n.Contains("sea")) return "/images/room_seaview.jpg";
+        if (n.Contains("suit") || n.Contains("suite") || n.Contains("jaku")) return "/images/room_suite.jpg";
+        if (n.Contains("aile") || n.Contains("family")) return "/images/room_family.jpg";
+        if (n.Contains("deluxe") || n.Contains("balkon")) return "/images/room_deluxe.jpg";
+        return "/images/room_standard.jpg";
+    }
+}

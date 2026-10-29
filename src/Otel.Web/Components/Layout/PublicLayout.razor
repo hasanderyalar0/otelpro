@@ -1,0 +1,736 @@
+@inherits LayoutComponentBase
+@inject NavigationManager Nav
+
+<div class="public-portal-shell">
+    <header class="public-header">
+        <div class="header-inner">
+            <!-- Brand -->
+            <a href="/pricing" class="portal-brand" title="OtelPro Ana Sayfa">
+                <div class="brand-icon-box">
+                    <svg class="brand-svg-logo" width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M4 21V6C4 4.89543 4.89543 4 6 4H14C15.1046 4 16 4.89543 16 6V21" stroke="url(#otel_grad1)" stroke-width="1.8" stroke-linecap="round"/>
+                        <path d="M16 11H18C19.1046 11 20 11.8954 20 13V21" stroke="url(#otel_grad2)" stroke-width="1.8" stroke-linecap="round"/>
+                        <path d="M8 21V17H12V21" stroke="#38bdf8" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+                        <circle cx="8" cy="8" r="1" fill="#38bdf8"/>
+                        <circle cx="12" cy="8" r="1" fill="#818cf8"/>
+                        <circle cx="8" cy="12" r="1" fill="#38bdf8"/>
+                        <circle cx="12" cy="12" r="1" fill="#818cf8"/>
+                        <path d="M2 21H22" stroke="rgba(255,255,255,0.35)" stroke-width="1.5" stroke-linecap="round"/>
+                        <defs>
+                            <linearGradient id="otel_grad1" x1="4" y1="4" x2="16" y2="21" gradientUnits="userSpaceOnUse">
+                                <stop stop-color="#38bdf8"/>
+                                <stop offset="1" stop-color="#818cf8"/>
+                            </linearGradient>
+                            <linearGradient id="otel_grad2" x1="16" y1="11" x2="20" y2="21" gradientUnits="userSpaceOnUse">
+                                <stop stop-color="#818cf8"/>
+                                <stop offset="1" stop-color="#c084fc"/>
+                            </linearGradient>
+                        </defs>
+                    </svg>
+                </div>
+                <div class="brand-text">
+                    <div class="brand-title-wrap">
+                        <span class="brand-name">Otel<span class="brand-gradient-pro">Pro</span></span>
+                        <span class="brand-badge-pill">AI</span>
+                    </div>
+                    <span class="brand-subtitle">AR-GE & İNOVASYON</span>
+                </div>
+            </a>
+
+            <!-- Sade ve Net Menü -->
+            <nav class="portal-nav">
+                <NavLink class="p-nav-link" href="/pricing" Match="NavLinkMatch.All">
+                    <span>Fiyatlar</span>
+                </NavLink>
+
+                <NavLink class="p-nav-link" href="/jobs">
+                    <span>Kariyer</span>
+                </NavLink>
+
+                <NavLink class="p-nav-link" href="/book">
+                    <span>Rezervasyon</span>
+                </NavLink>
+
+                <!-- Açılır Ar-Ge Menüsü (Hover Dropdown) -->
+                <div class="arge-dropdown-wrap">
+                    <button class="p-nav-link arge-trigger-btn" type="button">
+                        <span>🚀 Ar-Ge & İnovasyon</span>
+                        <span class="caret">▾</span>
+                    </button>
+                    <div class="arge-dropdown-menu">
+                        <NavLink class="dropdown-item" href="/digital-twin">
+                            <span class="item-ico">👁️</span>
+                            <div class="item-body">
+                                <b>3D Kat Planı Dijital İkiz</b>
+                                <small>IoT telemetrisi & canlı bina modeli</small>
+                            </div>
+                        </NavLink>
+                        <NavLink class="dropdown-item" href="/face-checkin">
+                            <span class="item-ico">📸</span>
+                            <div class="item-body">
+                                <b>Biyometrik Yüz Check-in</b>
+                                <small>Computer Vision & EGM polis bildirimi</small>
+                            </div>
+                        </NavLink>
+                        <NavLink class="dropdown-item" href="/rate-shopper">
+                            <span class="item-ico">🕵️‍♂️</span>
+                            <div class="item-body">
+                                <b>Rakip Fiyat Casusu</b>
+                                <small>CompSet pazar radarı & dinamik fiyat</small>
+                            </div>
+                        </NavLink>
+                        <NavLink class="dropdown-item" href="/guest-key">
+                            <span class="item-ico">📱</span>
+                            <div class="item-body">
+                                <b>Misafir Mobil Anahtar</b>
+                                <small>NFC kapı açma & oda servisi</small>
+                            </div>
+                        </NavLink>
+                        <NavLink class="dropdown-item" href="/trip-planner">
+                            <span class="item-ico">🗺️</span>
+                            <div class="item-body">
+                                <b>AI Kişisel Tur Rehberi & Rota</b>
+                                <small>Kişiselleştirilmiş interaktif gezi rotası</small>
+                            </div>
+                        </NavLink>
+                        <NavLink class="dropdown-item" href="/yield-radar">
+                            <span class="item-ico">📈</span>
+                            <div class="item-body">
+                                <b>Uçuş & Etkinlik AI Gelir Radarı</b>
+                                <small>Canlı uçak doluluğu, konser & surge fiyatlama</small>
+                            </div>
+                        </NavLink>
+                    </div>
+                </div>
+            </nav>
+
+            <!-- Sağ Taraf: TR/EN Dil Seçici ve Yönetim Paneli Butonu -->
+            <div class="header-right">
+                <div class="public-lang-switch">
+                    <button class="@(L.Lang == "tr" ? "active" : "")" @onclick='() => L.SetAsync("tr")' title="Türkçe">TR</button>
+                    <button class="@(L.Lang == "en" ? "active" : "")" @onclick='() => L.SetAsync("en")' title="English">EN</button>
+                </div>
+                <button class="public-theme-btn" @onclick="Theme.ToggleThemeAsync" title="@(Theme.IsDark ? (L.Lang == "tr" ? "Açık Temaya Geç" : "Switch to Light Mode") : (L.Lang == "tr" ? "Koyu Temaya Geç" : "Switch to Dark Mode"))">
+                    <span>@(Theme.IsDark ? "🌙" : "☀️")</span>
+                    <span class="theme-text">@(Theme.IsDark ? (L.Lang == "tr" ? "Koyu" : "Dark") : (L.Lang == "tr" ? "Açık" : "Light"))</span>
+                </button>
+                <a class="btn-demo-panel" href="/">
+                    🔐 @(L.Lang == "tr" ? "Yönetim Paneli" : "Management Console")
+                </a>
+            </div>
+        </div>
+    </header>
+
+    <main class="public-main-body">
+        @Body
+    </main>
+
+    <footer class="public-footer">
+        <div class="footer-grid">
+            <!-- Kolon 1: Marka & Platform Vizyonu -->
+            <div class="footer-col brand-col">
+                <div class="footer-brand-header">
+                    <div class="brand-icon-box">
+                        <svg class="brand-svg-logo" width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M4 21V6C4 4.89543 4.89543 4 6 4H14C15.1046 4 16 4.89543 16 6V21" stroke="url(#otel_grad1)" stroke-width="1.8" stroke-linecap="round"/>
+                            <path d="M16 11H18C19.1046 11 20 11.8954 20 13V21" stroke="url(#otel_grad2)" stroke-width="1.8" stroke-linecap="round"/>
+                            <path d="M8 21V17H12V21" stroke="#38bdf8" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+                            <circle cx="8" cy="8" r="1" fill="#38bdf8"/>
+                            <circle cx="12" cy="8" r="1" fill="#818cf8"/>
+                            <circle cx="8" cy="12" r="1" fill="#38bdf8"/>
+                            <circle cx="12" cy="12" r="1" fill="#818cf8"/>
+                            <path d="M2 21H22" stroke="rgba(255,255,255,0.35)" stroke-width="1.5" stroke-linecap="round"/>
+                        </svg>
+                    </div>
+                    <span class="brand-name">Otel<span class="brand-gradient-pro">Pro</span> <small class="brand-pill-tech">AI</small></span>
+                </div>
+                <p class="footer-brand-desc">
+                    @(L.Lang == "tr" 
+                        ? "Yeni nesil bulut tabanlı otonom otelcilik platformu. Ön bürodan 3D dijital bina ikizine, biyometrik yüz tanımadan canlı hava sahası uçuş ve dinamik gelir radarına kadar tüm otel operasyonları tek ekranda."
+                        : "Next-generation cloud-native autonomous hospitality platform. From front desk and 3D digital twins to biometric face recognition and live airspace flight yield radar.")
+                </p>
+                <div class="footer-tech-chips">
+                    <span class="f-tech-chip">⚡ 0 ms Gecikme</span>
+                    <span class="f-tech-chip">☁️ %100 Bulut Mimarisi</span>
+                    <span class="f-tech-chip">🛡️ Uçtan Uca Şifreli</span>
+                </div>
+            </div>
+
+            <!-- Kolon 2: İleri Seviye AR-GE & Yapay Zeka -->
+            <div class="footer-col">
+                <h5 class="f-col-title">🚀 @(L.Lang == "tr" ? "İleri Seviye AR-GE & Yapay Zeka" : "Advanced R&D & AI")</h5>
+                <ul class="footer-link-list">
+                    <li><a href="/digital-twin">👁️ 3D Bina Dijital İkizi</a></li>
+                    <li><a href="/face-checkin">📸 Biyometrik Yüz Tanıma & EGM</a></li>
+                    <li><a href="/yield-radar">📈 Uçuş, Etkinlik & Gelir Radarı</a></li>
+                    <li><a href="/rate-shopper">🕵️‍♂️ Rakip Tesis Pazar Fiyat Casusu</a></li>
+                    <li><a href="/trip-planner">🗺️ Yapay Zeka Gezi & Tur Rehberi</a></li>
+                    <li><a href="/guest-key">📱 Temassız Mobil Kapı Anahtarı</a></li>
+                </ul>
+            </div>
+
+            <!-- Kolon 3: Tesis Operasyonları & PMS -->
+            <div class="footer-col">
+                <h5 class="f-col-title">🏨 @(L.Lang == "tr" ? "Tesis Yönetimi (PMS)" : "Hotel Operations")</h5>
+                <ul class="footer-link-list">
+                    <li><a href="/frontdesk">🛎️ Ön Büro & Misafir Karşılama</a></li>
+                    <li><a href="/calendar">🗓️ Canlı Oda Matrisi & Takvim</a></li>
+                    <li><a href="/channels">🌐 Küresel Kanal Yöneticisi (OTA)</a></li>
+                    <li><a href="/kbs">🪪 KBS Polis & Jandarma Entegrasyonu</a></li>
+                    <li><a href="/housekeeping">🧹 Kat Hizmetleri & Oda Temizliği</a></li>
+                    <li><a href="/pricing">💳 Kurumsal Fiyatlandırma Paketleri</a></li>
+                </ul>
+            </div>
+
+            <!-- Kolon 4: Canlı Destek & İletişim -->
+            <div class="footer-col">
+                <h5 class="f-col-title">📡 @(L.Lang == "tr" ? "Merkez & Canlı Destek" : "HQ & Global Support")</h5>
+                <div class="footer-contact-info">
+                    <div class="f-contact-row">
+                        <span class="f-ci-ico">🏢</span>
+                        <span>OtelPro Ar-Ge Kampüsü, Maslak Teknokent / İstanbul</span>
+                    </div>
+                    <div class="f-contact-row">
+                        <span class="f-ci-ico">✉️</span>
+                        <span>destek@otelpro.com</span>
+                    </div>
+                    <div class="f-contact-row">
+                        <span class="f-ci-ico">📞</span>
+                        <b style="color:#38bdf8">+90 (850) 885 00 26</b>
+                    </div>
+                    <div class="f-status-box">
+                        <div class="fsb-top">
+                            <span class="pulse-dot-live"></span>
+                            <b>@(L.Lang == "tr" ? "Tüm Sistemler Çevrimiçi" : "All Systems Operational")</b>
+                        </div>
+                        <small>@(L.Lang == "tr" ? "Yüksek Hızlı Kesintisiz Bulut Altyapısı Aktif" : "Regional Multi-Cloud Active")</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Alt Telif & Rozet Çubuğu -->
+        <div class="footer-copy">
+            <div class="footer-copy-content">
+                <span class="f-copy-text">
+                    @(L.Lang == "tr" 
+                        ? "© 2026 OtelPro Bulut Otel Teknolojileri A.Ş. — Yeni Nesil Otonom Otel Yönetim ve Yapay Zeka Ekosistemi · Tüm Hakları Saklıdır"
+                        : "© 2026 OtelPro Cloud Technologies Inc. — Next-Gen Autonomous Hospitality Intelligence & PMS Ecosystem · All Rights Reserved")
+                </span>
+                <div class="footer-badge-row">
+                    <span class="footer-status-pill">
+                        <span class="pulse-dot-live"></span> 
+                        @(L.Lang == "tr" ? "Aktif Bulut Ağı · %99.99 SLA Güvencesi" : "Global Cloud Network · 99.99% SLA")
+                    </span>
+                    <span class="footer-status-pill">
+                        🛡️ @(L.Lang == "tr" ? "ISO/IEC 27001 & KVKK Uyumlu Altyapı" : "ISO/IEC 27001 & Privacy Compliant")
+                    </span>
+                </div>
+            </div>
+        </div>
+    </footer>
+    <AiCopilotWidget />
+</div>
+
+<style>
+.public-portal-shell {
+    min-height: 100vh;
+    background: #090d16;
+    color: #f1f5f9;
+    display: flex;
+    flex-direction: column;
+}
+.public-header {
+    background: rgba(15, 23, 42, 0.92);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    border-bottom: 1px solid rgba(51, 65, 85, 0.5);
+    position: sticky;
+    top: 0;
+    z-index: 100;
+}
+.header-inner {
+    max-width: 1300px;
+    margin: 0 auto;
+    padding: 12px 24px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 24px;
+}
+.portal-brand {
+    display: inline-flex;
+    align-items: center;
+    gap: 12px;
+    text-decoration: none;
+    color: inherit;
+    flex-shrink: 0;
+    padding: 6px 14px 6px 8px;
+    border-radius: 14px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    box-shadow: 0 4px 18px rgba(0, 0, 0, 0.25);
+    transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.portal-brand:hover {
+    background: rgba(255, 255, 255, 0.07);
+    border-color: rgba(56, 189, 248, 0.4);
+    box-shadow: 0 8px 25px -4px rgba(56, 189, 248, 0.25);
+    transform: translateY(-1px);
+}
+.brand-icon-box {
+    width: 38px;
+    height: 38px;
+    border-radius: 10px;
+    background: linear-gradient(135deg, rgba(56, 189, 248, 0.16) 0%, rgba(129, 140, 248, 0.1) 100%);
+    border: 1px solid rgba(56, 189, 248, 0.3);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 0 16px rgba(56, 189, 248, 0.18), inset 0 1px 1px rgba(255, 255, 255, 0.25);
+    transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    flex-shrink: 0;
+}
+.portal-brand:hover .brand-icon-box {
+    transform: scale(1.06);
+    border-color: rgba(56, 189, 248, 0.65);
+    box-shadow: 0 0 22px rgba(56, 189, 248, 0.45), inset 0 1px 2px rgba(255, 255, 255, 0.4);
+}
+.brand-text {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+.brand-title-wrap {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+.brand-name {
+    font-size: 1.15rem;
+    font-weight: 800;
+    letter-spacing: -0.4px;
+    line-height: 1.1;
+    color: #ffffff;
+}
+.brand-gradient-pro {
+    background: linear-gradient(135deg, #38bdf8 0%, #818cf8 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+.brand-badge-pill {
+    font-size: 0.58rem;
+    font-weight: 800;
+    padding: 1px 6px;
+    border-radius: 9999px;
+    background: linear-gradient(135deg, rgba(56, 189, 248, 0.2), rgba(129, 140, 248, 0.25));
+    border: 1px solid rgba(56, 189, 248, 0.4);
+    color: #38bdf8;
+    letter-spacing: 0.6px;
+    line-height: 1.3;
+    text-transform: uppercase;
+}
+.brand-subtitle {
+    font-size: 0.62rem;
+    font-weight: 700;
+    color: #2dd4bf;
+    letter-spacing: 1.1px;
+    text-transform: uppercase;
+    line-height: 1;
+}
+.portal-nav {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.p-nav-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 16px;
+    border-radius: 10px;
+    color: #cbd5e1;
+    text-decoration: none;
+    font-size: 0.9rem;
+    font-weight: 600;
+    white-space: nowrap;
+    transition: all 0.2s ease;
+    border: 1px solid transparent;
+}
+.p-nav-link:hover {
+    color: #fff;
+    background: rgba(51, 65, 85, 0.4);
+}
+.p-nav-link.active {
+    color: #2dd4bf;
+    background: rgba(45, 212, 191, 0.1);
+    border-color: rgba(45, 212, 191, 0.25);
+}
+
+/* Minimal Dropdown */
+.arge-dropdown-wrap {
+    position: relative;
+    display: inline-block;
+}
+.arge-trigger-btn {
+    background: rgba(56, 189, 248, 0.08);
+    border: 1px solid rgba(56, 189, 248, 0.3);
+    color: #38bdf8;
+    cursor: pointer;
+    font-family: inherit;
+}
+.arge-trigger-btn:hover {
+    background: rgba(56, 189, 248, 0.16);
+    border-color: #38bdf8;
+    color: #fff;
+}
+.arge-trigger-btn .caret {
+    font-size: 0.75rem;
+    margin-left: 3px;
+    transition: transform 0.2s;
+}
+.arge-dropdown-wrap:hover .caret {
+    transform: rotate(180deg);
+}
+.arge-dropdown-menu {
+    position: absolute;
+    top: calc(100% + 8px);
+    left: 50%;
+    transform: translateX(-50%) translateY(8px);
+    min-width: 330px;
+    background: rgba(15, 23, 42, 0.98);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(56, 189, 248, 0.3);
+    border-radius: 14px;
+    padding: 8px;
+    box-shadow: 0 20px 40px -10px rgba(0, 0, 0, 0.7), 0 0 15px rgba(14, 165, 233, 0.15);
+    opacity: 0;
+    pointer-events: none;
+    transition: all 0.2s ease;
+    z-index: 250;
+}
+.arge-dropdown-wrap:hover .arge-dropdown-menu,
+.arge-dropdown-wrap:focus-within .arge-dropdown-menu {
+    opacity: 1;
+    pointer-events: auto;
+    transform: translateX(-50%) translateY(0);
+}
+.dropdown-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 12px;
+    border-radius: 10px;
+    text-decoration: none;
+    color: #f1f5f9;
+    transition: all 0.15s;
+}
+.dropdown-item:hover {
+    background: rgba(56, 189, 248, 0.12);
+    transform: translateX(3px);
+}
+.dropdown-item .item-ico {
+    font-size: 1.3rem;
+    width: 32px;
+    height: 32px;
+    display: grid;
+    place-items: center;
+    background: rgba(30, 41, 59, 0.8);
+    border-radius: 8px;
+    border: 1px solid rgba(51, 65, 85, 0.5);
+    flex-shrink: 0;
+}
+.item-body b {
+    display: block;
+    font-size: 0.86rem;
+    color: #fff;
+    line-height: 1.2;
+}
+.item-body small {
+    display: block;
+    font-size: 0.72rem;
+    color: #94a3b8;
+    margin-top: 2px;
+    line-height: 1.2;
+}
+
+/* Sağ Buton & Dil Seçici */
+.header-right {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-shrink: 0;
+}
+.public-lang-switch {
+    display: inline-flex;
+    background: rgba(15, 23, 42, 0.85);
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    border-radius: 8px;
+    padding: 2px;
+}
+.public-lang-switch button {
+    background: transparent;
+    border: none;
+    color: #94a3b8;
+    font-size: 0.72rem;
+    font-weight: 800;
+    padding: 3px 8px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+.public-lang-switch button.active {
+    background: #0ea5e9;
+    color: #fff;
+    box-shadow: 0 0 10px rgba(14, 165, 233, 0.4);
+}
+.btn-demo-panel {
+    background: linear-gradient(135deg, #0ea5e9, #0d9488);
+    color: #fff;
+    padding: 8px 18px;
+    border-radius: 10px;
+    font-size: 0.88rem;
+    font-weight: 700;
+    text-decoration: none;
+    white-space: nowrap;
+    transition: all 0.2s;
+    box-shadow: 0 4px 12px rgba(14, 165, 233, 0.3);
+}
+.btn-demo-panel:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 6px 16px rgba(14, 165, 233, 0.45);
+}
+
+.public-main-body {
+    flex-grow: 1;
+}
+
+/* 4 Kolonlu Kurumsal Footer Tasarımı */
+.public-footer {
+    background: radial-gradient(circle at 50% -20%, rgba(14, 165, 233, 0.08) 0%, #060910 60%);
+    border-top: 1px solid rgba(56, 189, 248, 0.22);
+    padding: 48px 24px 24px;
+    margin-top: auto;
+    position: relative;
+}
+.footer-grid {
+    max-width: 1240px;
+    margin: 0 auto;
+    display: grid;
+    grid-template-columns: 1.4fr 1fr 1fr 1.15fr;
+    gap: 32px;
+}
+@("@media") (max-width: 992px) {
+    .footer-grid {
+        grid-template-columns: 1fr 1fr;
+        gap: 24px;
+    }
+}
+@("@media") (max-width: 600px) {
+    .footer-grid {
+        grid-template-columns: 1fr;
+    }
+}
+.footer-brand-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 12px;
+}
+.brand-pill-tech {
+    background: linear-gradient(135deg, #0ea5e9, #a855f7);
+    color: #fff;
+    font-size: 0.65rem;
+    font-weight: 800;
+    padding: 2px 6px;
+    border-radius: 6px;
+    margin-left: 4px;
+}
+.footer-brand-desc {
+    color: #94a3b8;
+    font-size: 0.82rem;
+    line-height: 1.55;
+    margin: 0 0 14px;
+}
+.footer-tech-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+.f-tech-chip {
+    font-size: 0.68rem;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    color: #cbd5e1;
+    padding: 3px 8px;
+    border-radius: 6px;
+    font-weight: 600;
+}
+.f-col-title {
+    color: #fff;
+    font-size: 0.92rem;
+    font-weight: 800;
+    margin: 0 0 16px;
+    letter-spacing: 0.3px;
+}
+.footer-link-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 9px;
+}
+.footer-link-list a {
+    color: #94a3b8;
+    text-decoration: none;
+    font-size: 0.82rem;
+    transition: all 0.2s;
+    display: inline-block;
+}
+.footer-link-list a:hover {
+    color: #38bdf8;
+    transform: translateX(3px);
+}
+.footer-contact-info {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    font-size: 0.8rem;
+    color: #94a3b8;
+}
+.f-contact-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    line-height: 1.4;
+}
+.f-ci-ico {
+    font-size: 1rem;
+    line-height: 1;
+}
+.f-status-box {
+    background: rgba(15, 23, 42, 0.7);
+    border: 1px solid rgba(16, 185, 129, 0.3);
+    border-radius: 10px;
+    padding: 8px 12px;
+    margin-top: 6px;
+}
+.fsb-top {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.75rem;
+    color: #34d399;
+}
+.f-status-box small {
+    font-size: 0.68rem;
+    color: #94a3b8;
+    display: block;
+    margin-top: 2px;
+}
+.footer-copy {
+    max-width: 1240px;
+    margin: 32px auto 0;
+    padding-top: 18px;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+.footer-copy-content {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 14px;
+}
+.f-copy-text {
+    font-size: 0.78rem;
+    color: #94a3b8;
+    font-weight: 500;
+}
+.footer-badge-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+.footer-status-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.72rem;
+    color: #cbd5e1;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.09);
+    padding: 3px 10px;
+    border-radius: 9999px;
+}
+.pulse-dot-live {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: #10b981;
+    box-shadow: 0 0 10px #10b981;
+    animation: livePulse 1.6s infinite;
+}
+@("@keyframes") livePulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.5; transform: scale(1.3); }
+}
+
+@("@media") (max-width: 860px) {
+    .portal-nav {
+        display: none;
+    }
+    .header-inner {
+        padding: 10px 16px;
+    }
+}
+.public-theme-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    border-radius: 9999px;
+    padding: 5px 12px;
+    color: #e2e8f0;
+    font-size: 0.8rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+.public-theme-btn:hover {
+    background: rgba(255, 255, 255, 0.12);
+    transform: translateY(-1px);
+}
+[data-theme="light"] .public-theme-btn {
+    background: #ffffff;
+    border-color: #cbd5e1;
+    color: #0f172a;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+[data-theme="light"] .public-theme-btn:hover {
+    background: #f1f5f9;
+}
+</style>
+
+@code {
+    protected override async Task OnInitializedAsync()
+    {
+        L.Changed += StateHasChanged;
+        Theme.Changed += StateHasChanged;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool first)
+    {
+        if (first)
+        {
+            await L.InitAsync();
+            await Theme.InitAsync();
+            StateHasChanged();
+        }
+    }
+}

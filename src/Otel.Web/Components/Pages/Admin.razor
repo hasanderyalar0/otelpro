@@ -1,0 +1,78 @@
+@page "/admin"
+@inject AppDb Db
+
+<div class="page-head">
+    <div>
+        <h1>@L["nav.admin"]</h1>
+        <p>@(L.Lang == "tr" ? "Kullanıcı Yönetimi, Rol Yetkilendirme ve Sistem Denetim İzi (Audit Log)" : "User accounts, role assignments, and system audit logs")</p>
+    </div>
+</div>
+
+<div class="grid g2 mb">
+    <div class="card">
+        <h3>Sistem Kullanıcıları ve Roller</h3>
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Kullanıcı Adı</th>
+                        <th>Ad Soyad</th>
+                        <th>Rol</th>
+                        <th>Durum</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var u in users)
+                    {
+                        <tr>
+                            <td><b>@u.Username</b></td>
+                            <td>@u.FullName</td>
+                            <td><span class="badge b-info">@u.Role</span></td>
+                            <td><span class="badge @(u.IsActive ? "b-ok" : "b-bad")">@(u.IsActive ? "Aktif" : "Pasif")</span></td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="card">
+        <h3>Son Sistem İşlem Kayıtları (Audit Logs)</h3>
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Tarih</th>
+                        <th>Kullanıcı</th>
+                        <th>İşlem</th>
+                        <th>Varlık</th>
+                        <th>Detay</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var a in auditLogs)
+                    {
+                        <tr>
+                            <td><small>@Fmt.DT(a.At)</small></td>
+                            <td><b>@a.Username</b></td>
+                            <td><span class="badge b-Clean">@a.Action</span></td>
+                            <td>@a.Entity</td>
+                            <td><small>@a.Details</small></td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+@code {
+    List<AppUser> users = new();
+    List<AuditLog> auditLogs = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        users = await Db.Users.OrderBy(u => u.Username).ToListAsync();
+        auditLogs = await Db.AuditLogs.OrderByDescending(a => a.Id).Take(50).ToListAsync();
+    }
+}

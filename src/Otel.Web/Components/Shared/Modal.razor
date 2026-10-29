@@ -1,0 +1,18 @@
+@if (Show)
+{
+    <div class="overlay" @onclick="Close">
+        <div class="modal" style="@(Width != null ? $"width:min({Width},100%)" : "")" @onclick:stopPropagation>
+            <div class="modal-head"><h2>@Title</h2><button class="x" @onclick="Close">✕</button></div>
+            @ChildContent
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public bool Show { get; set; }
+    [Parameter] public EventCallback<bool> ShowChanged { get; set; }
+    [Parameter] public string Title { get; set; } = "";
+    [Parameter] public string? Width { get; set; }
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+    async Task Close() { Show = false; await ShowChanged.InvokeAsync(false); }
+}

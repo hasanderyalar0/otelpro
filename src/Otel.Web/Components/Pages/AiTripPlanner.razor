@@ -1,0 +1,1172 @@
+@page "/trip-planner"
+@layout Otel.Web.Components.Layout.PublicLayout
+@inject TripPlannerService TripPlanner
+@inject BookingService BookingSvc
+@inject NearbyService NearbySvc
+@inject HotelState HotelState
+@inject IJSRuntime JS
+@inject NavigationManager Nav
+
+<PageTitle>AI Kişisel Tur Rehberi & Akıllı Gezi Rotası | OtelPro</PageTitle>
+
+<div class="trip-planner-container">
+    <!-- Hero Bölümü -->
+    <div class="trip-hero">
+        <div class="hero-chip">
+            <span class="chip-dot"></span>
+            <span>🗺️ AI KİŞİSEL TUR REHBERİ & AKILLI GEZİ ROTASI JENERATÖRÜ</span>
+        </div>
+        <h1 class="trip-hero-title">
+            <span>✨</span> AI Kişisel Tur Rehberiniz ile <span>Kişiselleştirilmiş Gezi & Lezzet Rotası</span>
+        </h1>
+        <p class="trip-hero-desc">
+            Yapay zeka motorumuz otelinizin bulunduğu şehir ve çevresindeki seçkin noktaları analiz ederek;
+            ilgi alanlarınıza, temponuza, ulaşım tercihinize ve bütçenize göre dakikası dakikasına optimize edilmiş eksiksiz bir gezi ve lezzet rotası çizer.
+        </p>
+
+        <div class="trip-hero-stats">
+            <div class="hero-stat-badge"><span>🏨</span> 8 Seçkin Destinasyon</div>
+            <div class="hero-stat-badge"><span>🧠</span> Çok Kriterli AI Rota Optimizasyonu</div>
+            <div class="hero-stat-badge"><span>🔊</span> Sesli AI Concierge Anlatımı</div>
+            <div class="hero-stat-badge"><span>📅</span> Apple / Google Takvim (.ics)</div>
+            <div class="hero-stat-badge"><span>🧾</span> Oda Folyosuna Tek Tıkla Ekleme</div>
+        </div>
+    </div>
+
+    <!-- Rota Yapılandırma Paneli (Ayarlar & Tercihler) -->
+    <div class="planner-config-card">
+        <div class="config-sec-title">
+            <span>⚙️</span>
+            <h3>Gezi Parametrelerini & İlgi Alanlarınızı Belirleyin</h3>
+        </div>
+
+        <div class="config-grid">
+            <!-- 1. Otel & Şehir Seçimi -->
+            <div class="config-item">
+                <label class="config-label">1. Tesis & Destinasyon Seçin</label>
+                <select class="custom-select" value="@selectedHotelId" @onchange="OnHotelChanged">
+                    @foreach (var h in hotels)
+                    {
+                        <option value="@h.Id">🏢 @h.Name (@h.City)</option>
+                    }
+                </select>
+                <small class="config-hint">Seçili tesis başlangıç ve bitiş noktası olarak hesaplanacaktır.</small>
+            </div>
+
+            <!-- 2. Seyahat Süresi -->
+            <div class="config-item">
+                <label class="config-label">2. Gezi Süresi</label>
+                <div class="pill-group">
+                    <button type="button" class="pill-btn @(selectedDays == 1 ? "active" : "")" @onclick="() => ChangeDaysAsync(1)">
+                        ⚡ 1 Gün (Express 24h)
+                    </button>
+                    <button type="button" class="pill-btn @(selectedDays == 2 ? "active" : "")" @onclick="() => ChangeDaysAsync(2)">
+                        🌟 2 Gün (Hafta Sonu 48h)
+                    </button>
+                    <button type="button" class="pill-btn @(selectedDays == 3 ? "active" : "")" @onclick="() => ChangeDaysAsync(3)">
+                        👑 3 Gün (Grand Tour 72h)
+                    </button>
+                </div>
+            </div>
+
+            <!-- 3. Başlangıç Tarihi & Kişi Sayısı -->
+            <div class="config-item">
+                <label class="config-label">3. Başlangıç Tarihi & Misafir</label>
+                <div style="display:grid;grid-template-columns:1.3fr 0.85fr 0.85fr;gap:6px">
+                    <input type="date" class="custom-select" value="@selectedStartDate.ToString("yyyy-MM-dd")" @onchange="OnStartDateChanged" />
+                    <select class="custom-select" value="@selectedAdults" @onchange="OnAdultsChanged" title="Yetişkin Sayısı">
+                        <option value="1">👤 1 Yetişkin</option>
+                        <option value="2">👥 2 Yetişkin</option>
+                        <option value="3">👥 3 Yetişkin</option>
+                        <option value="4">👥 4 Yetişkin</option>
+                    </select>
+                    <select class="custom-select" value="@selectedChildren" @onchange="OnChildrenChanged" title="Çocuk Sayısı">
+                        <option value="0">👶 0 Çocuk</option>
+                        <option value="1">👶 1 Çocuk</option>
+                        <option value="2">👶 2 Çocuk</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- 4. Tempo & Bütçe -->
+            <div class="config-item">
+                <label class="config-label">4. Tempo & Bütçe Seviyesi</label>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+                    <select class="custom-select" value="@selectedPace" @onchange="OnPaceChanged">
+                        <option value="relaxed">☕ Rahat & Yavaş (Slow Travel)</option>
+                        <option value="active">⚡ Dinamik & Dolu Dolu (Action)</option>
+                    </select>
+                    <select class="custom-select" value="@selectedBudget" @onchange="OnBudgetChanged">
+                        <option value="luxury">💎 Lüks & Fine Dining</option>
+                        <option value="comfort">⭐ Dengeli & Konforlu</option>
+                        <option value="local">🎒 Otantik & Yerel</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- 5. Ulaşım Seçeneği -->
+            <div class="config-item">
+                <label class="config-label">5. Tercih Edilen Ulaşım</label>
+                <select class="custom-select" value="@selectedTransport" @onchange="OnTransportChanged">
+                    <option value="vip">🚗 Özel VIP Şoförlü Mercedes Vito</option>
+                    <option value="taxi">🚕 Yerel Taksi & Yürüyüş</option>
+                    <option value="car">🏎️ Kiralık SUV / Cabrio Araç</option>
+                    <option value="walk">🚶 Doğa Yürüyüşü & Toplu Taşıma</option>
+                </select>
+            </div>
+        </div>
+
+        <!-- 6. Seyahat Profili (Kiminle / Hangi Amaçla?) -->
+        <div style="margin-top:24px">
+            <label class="config-label" style="margin-bottom:10px">6. Seyahat Profiliniz & İlgi Alanınız (Anında Güncellenir)</label>
+            <div class="profile-cards-grid">
+                <div class="profile-card @(selectedProfile == "romantic" ? "active" : "")" @onclick='() => SelectProfileAsync("romantic")'>
+                    <span class="profile-ico">💑</span>
+                    <b>Romantik Çift & Balayı</b>
+                    <small>Sakin koylar, gün batımı kokteylleri ve mum ışığında akşam yemeği</small>
+                </div>
+
+                <div class="profile-card @(selectedProfile == "family" ? "active" : "")" @onclick='() => SelectProfileAsync("family")'>
+                    <span class="profile-ico">👨‍👩‍👧‍👦</span>
+                    <b>Çocuklu Aile & Güvenli</b>
+                    <small>Düz ayak rotalar, dev tünel akvaryum, tema parklar ve çocuk dostu menüler</small>
+                </div>
+
+                <div class="profile-card @(selectedProfile == "history" ? "active" : "")" @onclick='() => SelectProfileAsync("history")'>
+                    <span class="profile-ico">🏛️</span>
+                    <b>Tarih & Kültür Kaşifi</b>
+                    <small>Müzeler, saraylar, antik tiyatrolar ve derin tarih anlatımları</small>
+                </div>
+
+                <div class="profile-card @(selectedProfile == "adventure" ? "active" : "")" @onclick='() => SelectProfileAsync("adventure")'>
+                    <span class="profile-ico">🏄‍♂️</span>
+                    <b>Macera & Adrenalin</b>
+                    <small>Yamaç paraşütü, nehir raftingi, kanyon zipline ve ATV dağ safarisi</small>
+                </div>
+
+                <div class="profile-card @(selectedProfile == "gourmet" ? "active" : "")" @onclick='() => SelectProfileAsync("gourmet")'>
+                    <span class="profile-ico">🍽️</span>
+                    <b>Gurme Gastronomi</b>
+                    <small>Taş fırın tandırlar, şarap tadımı, yerel tatlılar ve Michelin seçkisi</small>
+                </div>
+
+                <div class="profile-card @(selectedProfile == "wellness" ? "active" : "")" @onclick='() => SelectProfileAsync("wellness")'>
+                    <span class="profile-ico">🧘</span>
+                    <b>Wellness & Doğa Huzuru</b>
+                    <small>Termal sular, Türk hamamı ritüelleri, yoga ve sessiz manzaralar</small>
+                </div>
+            </div>
+        </div>
+
+        <!-- 7. Gelişmiş Tercihler & AI İstek Kutusu -->
+        <div class="advanced-settings-wrap">
+            <div>
+                <label class="config-label" style="font-size:0.78rem">Özel Tercihler & Hassasiyetler</label>
+                <div class="pref-chips-grid">
+                    <div class="pref-chip @(selectedPreferences.Contains("photo") ? "active" : "")" @onclick='() => TogglePreference("photo")'>
+                        📸 Profesyonel Fotoğraf Çekim Noktaları
+                    </div>
+                    <div class="pref-chip @(selectedPreferences.Contains("museum") ? "active" : "")" @onclick='() => TogglePreference("museum")'>
+                        🏛️ Müze Kart Dahil Edilsin
+                    </div>
+                    <div class="pref-chip @(selectedPreferences.Contains("vegetarian") ? "active" : "")" @onclick='() => TogglePreference("vegetarian")'>
+                        🥗 Vejetaryen / Sağlıklı Menü
+                    </div>
+                    <div class="pref-chip @(selectedPreferences.Contains("stroller") ? "active" : "")" @onclick='() => TogglePreference("stroller")'>
+                        👶 Bebek Arabasına Uygun Düz Ayak
+                    </div>
+                    <div class="pref-chip @(selectedPreferences.Contains("sunset") ? "active" : "")" @onclick='() => TogglePreference("sunset")'>
+                        🌅 Gün Batımı Ön Sıra Masa Garantisi
+                    </div>
+                </div>
+            </div>
+
+            <div class="custom-prompt-row">
+                <label class="config-label" style="font-size:0.78rem">Özel AI Notunuz / Misafir Talebiniz</label>
+                <div style="display:flex;gap:8px">
+                    <input type="text" class="custom-select" style="flex:1" 
+                           placeholder="Örn: Eşimin doğum günü için pasta sürprizi, sessiz sakin plajlar, drone ile çekim..." 
+                           @bind="customAiPrompt" @bind:event="oninput" @onkeydown="OnPromptKeyDown" />
+                    <button class="btn primary sm" style="padding:8px 18px" @onclick="GenerateRouteAsync">Uygula</button>
+                </div>
+
+                <div class="quick-prompts-list">
+                    <span class="quick-prompt-tag" @onclick='() => ApplyQuickPrompt("🎂 Doğum günü için akşam yemeğinde pasta sürprizi")'>🎂 Doğum Günü Pastası</span>
+                    <span class="quick-prompt-tag" @onclick='() => ApplyQuickPrompt("💍 Romantik evlilik teklifi & özel keman sürprizi")'>💍 Evlilik Teklifi</span>
+                    <span class="quick-prompt-tag" @onclick='() => ApplyQuickPrompt("🥗 Glutensiz ve vegan menü alternatifleri")'>🥗 Glutensiz / Vegan Menü</span>
+                    <span class="quick-prompt-tag" @onclick='() => ApplyQuickPrompt("👶 Bebek arabasına uygun engelsiz düz ayak mekanlar")'>👶 Bebek Arabası Uygunluğu</span>
+                    <span class="quick-prompt-tag" @onclick='() => ApplyQuickPrompt("🌊 Yalnızca dalgasız sığ ve sakin koylar")'>🌊 Dalgasız Sakin Koylar</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Buton: AI Rotayı Hesapla -->
+        <div style="text-align:center;margin-top:24px">
+            <button class="btn-generate-route" @onclick="GenerateRouteAsync" disabled="@isGenerating">
+                @if (isGenerating)
+                {
+                    <span>🧠 AI Rotayı Optimize Ediyor & Hesaplıyor...</span>
+                }
+                else
+                {
+                    <span>✨ Yapay Zeka ile Kişisel Rota Oluştur</span>
+                }
+            </button>
+        </div>
+    </div>
+
+    <!-- Oluşturulan Rota Sonuçları -->
+    @if (currentPlan != null)
+    {
+        <div class="itinerary-results-section" id="itinerarySection">
+            <!-- Üst Başlık & Hızlı Dışa Aktarma Eylemleri -->
+            <div class="itinerary-header-bar">
+                <div>
+                    <div class="plan-kicker">AI TARAFINDAN ÖZEL OLUŞTURULAN GEZİ PROGRAMI</div>
+                    <h2 class="plan-title">@currentPlan.ProfileTitle</h2>
+                    <div class="plan-meta">
+                        <span>🏨 @currentPlan.Hotel.Name (@currentPlan.Hotel.City)</span>
+                        <span>•</span>
+                        <span>📅 @currentPlan.StartDate.ToString("dd MMMM yyyy")</span>
+                        <span>•</span>
+                        <span>⏱️ @currentPlan.Days Günlük Program</span>
+                        <span>•</span>
+                        <span>👥 @currentPlan.Adults Yetişkin @(currentPlan.Children > 0 ? $"+ {currentPlan.Children} Çocuk" : "")</span>
+                        <span>•</span>
+                        <span>@currentPlan.TransportTitle</span>
+                    </div>
+                </div>
+
+                <div class="plan-actions-group">
+                    <button class="btn-action speech @(isSpeaking ? "active" : "")" @onclick="ToggleSpeechAsync" title="Günün Gezi Rehberini Sesli Dinle">
+                        @(isSpeaking ? "⏹️ Durdur" : "🔊 Sesli Dinle")
+                    </button>
+                    <button class="btn-action calendar" @onclick="DownloadIcsCalendar" title="Apple / Google Takvime Ekle (.ics)">
+                        📅 Takvime Ekle
+                    </button>
+                    <button class="btn-action whatsapp" @onclick="OpenWhatsAppModal" title="WhatsApp'a Gönder">
+                        💬 WhatsApp'a Gönder
+                    </button>
+                    <button class="btn-action print" @onclick="PrintItinerary" title="Yazdır veya PDF Kaydet">
+                        🖨️ PDF / Yazdır
+                    </button>
+                    <button class="btn-action folio" @onclick="OpenFolioModal" title="Oda Folyosuna Tur Kaydet">
+                        🧾 Folyoya Ekle
+                    </button>
+                </div>
+            </div>
+
+            <!-- Canlı Hava Durumu & Rota İstatistik Karnesi -->
+            <div class="plan-stats-strip">
+                <div class="stat-box weather">
+                    <span class="weather-icon">@currentPlan.Weather.Icon</span>
+                    <div>
+                        <div class="stat-val">@currentPlan.Weather.TempC°C</div>
+                        <div class="stat-sub">@currentPlan.Weather.City · @currentPlan.Weather.Condition</div>
+                        <small style="color:#94a3b8;font-size:0.7rem">@currentPlan.Weather.Advice</small>
+                    </div>
+                </div>
+
+                <div class="stat-box">
+                    <span class="stat-ico">🚶</span>
+                    <div>
+                        <div class="stat-val">@currentPlan.TotalDistanceKm km</div>
+                        <div class="stat-sub">Toplam Gezi Mesafesi</div>
+                    </div>
+                </div>
+
+                <div class="stat-box">
+                    <span class="stat-ico">⏱️</span>
+                    <div>
+                        <div class="stat-val">~8.5 Saat</div>
+                        <div class="stat-sub">Günlük Gezi & Keşif Süresi</div>
+                    </div>
+                </div>
+
+                <div class="stat-box highlight">
+                    <span class="stat-ico">💰</span>
+                    <div>
+                        <div class="stat-val">@Fmt.Money(currentPlan.TotalCostPerPerson)</div>
+                        <div class="stat-sub">Kişi Başı Tahmini Bütçe</div>
+                        <small style="color:#34d399;font-size:0.7rem">Toplam: @Fmt.Money(currentPlan.TotalCostPerPerson * (currentPlan.Adults + currentPlan.Children)) (@(currentPlan.Adults + currentPlan.Children) Misafir)</small>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Valiz & Seyahat İpuçları Kutusu -->
+            @if (currentPlan.PackingTips.Count > 0)
+            {
+                <div class="packing-tips-bar">
+                    <span style="font-size:1.1rem">🎒</span>
+                    <b style="color:#fff;font-size:0.85rem">Bu Rota İçin AI Valiz & Hazırlık Tavsiyeleri:</b>
+                    <div class="tips-chips">
+                        @foreach (var tip in currentPlan.PackingTips)
+                        {
+                            <span class="tip-chip">@tip</span>
+                        }
+                    </div>
+                </div>
+            }
+
+            <!-- AI Kişisel Tur Rehberi Profil Kartı -->
+            <div class="guide-profile-card">
+                <div class="guide-avatar-wrap">
+                    <span class="guide-avatar-emoji">@currentPlan.Guide.Avatar</span>
+                    <span class="guide-online-badge" title="Canlı Rehberlik Aktif"></span>
+                </div>
+                <div class="guide-info-main">
+                    <div class="guide-top-line">
+                        <span class="guide-badge-pill">@currentPlan.Guide.Badge</span>
+                        <span class="guide-rating-pill">⭐ @currentPlan.Guide.Rating</span>
+                        <span class="guide-status-pill">@currentPlan.Guide.Status</span>
+                    </div>
+                    <h3 class="guide-name">@currentPlan.Guide.Name <small>· @currentPlan.Guide.Title</small></h3>
+                    <p class="guide-welcome-msg">
+                        "@currentPlan.Guide.PersonalizedWelcome"
+                    </p>
+                    <div class="guide-meta-chips">
+                        <span class="g-chip">💼 @currentPlan.Guide.Experience</span>
+                        <span class="g-chip">🗣️ @currentPlan.Guide.Languages</span>
+                        <span class="g-chip">📞 Direkt Destek: @currentPlan.Guide.PhoneDirect</span>
+                    </div>
+                </div>
+                <div class="guide-action-side">
+                    <button class="btn-guide-ask-main" @onclick="() => OpenAskGuideModal(ActiveDayStops.FirstOrDefault())">
+                        <span style="font-size:1.3rem">💬</span>
+                        <div>
+                            <b>Rehbere Danış</b>
+                            <small>Soru Sor & Tavsiye Al</small>
+                        </div>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Gün Değiştirici Sekmeler (1. Gün, 2. Gün, 3. Gün) -->
+            @if (currentPlan.Days > 1)
+            {
+                <div class="day-tabs-wrapper">
+                    @for (int d = 1; d <= currentPlan.Days; d++)
+                    {
+                        var dayNum = d;
+                        var dayDate = currentPlan.StartDate.AddDays(dayNum - 1);
+                        var dayTitle = dayNum switch
+                        {
+                            1 => $"1. Gün: İlk Heyecan & Keşif ({dayDate:dd MMM})",
+                            2 => $"2. Gün: Zirve & Derin Deneyim ({dayDate:dd MMM})",
+                            3 => $"3. Gün: Büyük Final & Veda ({dayDate:dd MMM})",
+                            _ => $"{dayNum}. Gün ({dayDate:dd MMM})"
+                        };
+                        <button class="day-tab-btn @(activeDayTab == dayNum ? "active" : "")" @onclick="() => SwitchDayTab(dayNum)">
+                            <span>📅 @dayTitle</span>
+                            <small>(@(currentPlan.Stops.Count(s => s.Day == dayNum)) Durak)</small>
+                        </button>
+                    }
+                </div>
+            }
+
+            <!-- Rota & Harita 2 Sütunlu Grid -->
+            <div class="itinerary-content-grid">
+                <!-- Sol Sütun: Saat Saat Zaman Çizelgesi (Timeline) -->
+                <div class="timeline-column">
+                    <div class="timeline-head">
+                        <h3>📍 @activeDayTab. Günün Saat Saat Rota Akışı</h3>
+                        <div style="display:flex;align-items:center;gap:8px">
+                            <span class="badge b-info">@ActiveDayStops.Count Durak</span>
+                            <span class="badge" style="background:rgba(255,255,255,0.08);color:#cbd5e1">@currentPlan.StartDate.AddDays(activeDayTab - 1).ToString("dddd, dd MMMM")</span>
+                        </div>
+                    </div>
+
+                    <div class="timeline-stops-list">
+                        @for (int i = 0; i < ActiveDayStops.Count; i++)
+                        {
+                            var stop = ActiveDayStops[i];
+                            var stopIndex = i + 1;
+
+                            <div class="timeline-stop-card">
+                                <!-- Durak Numarası ve Çizgi -->
+                                <div class="stop-number-col">
+                                    <div class="stop-badge-circle" style="border-color:@stop.BadgeColor">
+                                        <span>@stopIndex</span>
+                                    </div>
+                                    @if (i < ActiveDayStops.Count - 1)
+                                    {
+                                        <div class="stop-line"></div>
+                                    }
+                                </div>
+
+                                <!-- Durak İçerik Kartı -->
+                                <div class="stop-card-main">
+                                    <div class="stop-card-media" style="background-image: url('@stop.ImageUrl')">
+                                        <div class="stop-time-chip">
+                                            <span>⏱️ @stop.TimeSlot</span>
+                                        </div>
+                                        <div class="stop-cat-chip" style="background:rgba(15,23,42,0.85);border:1px solid @stop.BadgeColor;color:#fff">
+                                            <span>@stop.CategoryIcon @stop.CategoryName</span>
+                                        </div>
+                                    </div>
+
+                                    <div class="stop-card-body">
+                                        <div class="stop-head-row">
+                                            <h4 class="stop-title">@stop.Title</h4>
+                                            <div class="stop-rating">⭐ @stop.Rating</div>
+                                        </div>
+
+                                        <p class="stop-desc">@stop.Description</p>
+
+                                        <!-- Ne Denenmeli / Spesiyal -->
+                                        @if (!string.IsNullOrWhiteSpace(stop.Specialty))
+                                        {
+                                            <div class="stop-specialty-box">
+                                                <b>⭐ Ne Denenmeli / Yapılmalı:</b>
+                                                <span>@stop.Specialty</span>
+                                            </div>
+                                        }
+
+                                        <!-- Concierge Gizli İpucu -->
+                                        @if (!string.IsNullOrWhiteSpace(stop.ConciergeTip))
+                                        {
+                                            <div class="stop-tip-box">
+                                                <span>💡 <b>Concierge Tüyosu:</b> @stop.ConciergeTip</span>
+                                            </div>
+                                        }
+
+                                        <!-- Alt Bilgi: Mesafe, Maliyet ve Butonlar -->
+                                        <div class="stop-footer">
+                                            <div class="stop-transit-meta">
+                                                <span>📍 @stop.DistanceText</span>
+                                                <span>•</span>
+                                                <span>🚗 @stop.TransitText</span>
+                                                <span>•</span>
+                                                <b style="color:#34d399">💰 ~@Fmt.Money(stop.EstCost) / Kişi</b>
+                                            </div>
+
+                                            <div class="stop-actions">
+                                                <button class="btn sm btn-stop-guide" @onclick="() => OpenAskGuideModal(stop)" title="Bu durak hakkında rehberinize danışın">
+                                                    💬 Rehbere Danış
+                                                </button>
+                                                <button class="btn sm btn-stop-voice @(activePlayingStopId == stop.Id ? "playing" : "")" @onclick="() => PlayStopSpeech(stop)" title="Rehberin bu durak anlatımını sesli dinleyin">
+                                                    @(activePlayingStopId == stop.Id ? "⏹️ Durdur" : "🎙️ Dinle")
+                                                </button>
+                                                <button class="btn sm" style="font-size:0.75rem;padding:6px 12px" @onclick="() => FocusStopOnMap(stop)">
+                                                    🗺️ Haritada Gör
+                                                </button>
+                                                <a class="btn sm primary" href="https://maps.google.com/?q=@stop.Latitude,@stop.Longitude" target="_blank" style="font-size:0.75rem;padding:6px 12px;text-decoration:none">
+                                                    🧭 Yol Tarifi
+                                                </a>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                </div>
+
+                <!-- Sağ Sütun: İnteraktif Rota Haritası (Leaflet Sticky Map) -->
+                <div class="map-sticky-column">
+                    <div class="map-container-box @(isMapExpanded ? "expanded" : "")">
+                        <div class="map-header-inner">
+                            <div style="display:flex;align-items:center;gap:8px">
+                                <span style="font-size:1.1rem">🗺️</span>
+                                <div>
+                                    <b style="color:#fff;font-size:0.88rem">Canlı Rota & Transfer Haritası</b>
+                                    <div style="font-size:0.7rem;color:#94a3b8">@currentPlan.Hotel.Name ➔ @ActiveDayStops.Count Durak</div>
+                                </div>
+                            </div>
+                            <div class="map-toolbar-group">
+                                <button type="button" class="map-theme-btn @(mapTheme == "dark" ? "active" : "")" @onclick='() => ChangeMapTheme("dark")' title="Koyu Mod (Dark Matter)">
+                                    🌙 Koyu
+                                </button>
+                                <button type="button" class="map-theme-btn @(mapTheme == "satellite" ? "active" : "")" @onclick='() => ChangeMapTheme("satellite")' title="Uydu Görüntüsü (ArcGIS Satellite)">
+                                    🛰️ Uydu
+                                </button>
+                                <button type="button" class="map-theme-btn @(mapTheme == "streets" ? "active" : "")" @onclick='() => ChangeMapTheme("streets")' title="Standart Sokak Haritası">
+                                    🗺️ Sokak
+                                </button>
+                                <button type="button" class="map-reset-btn" @onclick="ResetMapZoom" title="Tüm Durakları Ekrana Sığdır">
+                                    🔍 Sıfırla
+                                </button>
+                                <button type="button" class="map-expand-btn" @onclick="ToggleMapExpand" title="@(isMapExpanded ? "Küçült" : "Genişlet")">
+                                    @(isMapExpanded ? "✕ Kapat" : "⛶ Genişlet")
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Canlı Rota HUD Rozeti -->
+                        <div class="map-live-hud">
+                            <span class="hud-dot"></span>
+                            <span>@currentPlan.TransportTitle</span>
+                            <span>•</span>
+                            <span>📍 @ActiveDayStops.Count Durak</span>
+                            <span>•</span>
+                            <span style="color:#38bdf8">~@currentPlan.TotalDistanceKm km Rota</span>
+                        </div>
+
+                        <div id="tripPlannerMap" style="height: 520px; width: 100%; border-radius: 0 0 16px 16px;"></div>
+
+                        <div class="map-foot-legend">
+                            <span class="leg-item"><span class="leg-dot hotel"></span> 🏨 Başlangıç: @currentPlan.Hotel.City</span>
+                            <span class="leg-item"><span class="leg-dot route"></span> --- Rota Hattı</span>
+                            <span class="leg-item"><span class="leg-dot stop"></span> [1]..[@ActiveDayStops.Count] Duraklar</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+
+    <!-- ================= MODALLAR ================= -->
+
+    <!-- 1. WhatsApp Paylaşım Modalı -->
+    @if (showWhatsAppModal && currentPlan != null)
+    {
+        <div class="custom-modal-backdrop" @onclick="() => showWhatsAppModal = false">
+            <div class="custom-modal-card" @onclick:stopPropagation="true">
+                <div class="modal-head">
+                    <div style="display:flex;align-items:center;gap:10px">
+                        <span style="font-size:1.5rem">💬</span>
+                        <div>
+                            <h3 style="margin:0;color:#fff">Gezi Planını WhatsApp'a Gönder</h3>
+                            <small style="color:#94a3b8">Misafir telefonuna doğrudan düzenli gezi rehberi gönderin</small>
+                        </div>
+                    </div>
+                    <button class="modal-close-btn" @onclick="() => showWhatsAppModal = false">✕</button>
+                </div>
+
+                <div class="modal-body">
+                    <label style="font-size:0.8rem;color:#cbd5e1;font-weight:600">Misafir Telefon Numarası (Başında 0 olmadan)</label>
+                    <input type="text" class="custom-select" style="width:100%;margin-top:6px" placeholder="532 123 45 67" @bind="targetWhatsAppPhone" />
+
+                    <label style="font-size:0.8rem;color:#cbd5e1;font-weight:600;margin-top:14px;display:block">Gönderilecek Rota Özeti</label>
+                    <div class="whatsapp-preview-box" style="margin-top:6px">@GeneratedWhatsAppText</div>
+
+                    <div style="display:flex;gap:10px;margin-top:16px">
+                        <a class="btn primary" style="flex:1;text-align:center;text-decoration:none;padding:12px;font-weight:700" 
+                           href="https://api.whatsapp.com/send?phone=@(FormatWhatsApp(targetWhatsAppPhone))&text=@(Uri.EscapeDataString(GeneratedWhatsAppText))" 
+                           target="_blank" @onclick="() => showWhatsAppModal = false">
+                            📲 Doğrudan WhatsApp'ta Aç
+                        </a>
+                        <button class="btn" @onclick="CopyWhatsAppText">📋 Kopyala</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+
+    <!-- 2. Oda Folyosuna Tur Bedeli Ekleme Modalı -->
+    @if (showFolioModal && currentPlan != null)
+    {
+        <div class="custom-modal-backdrop" @onclick="() => showFolioModal = false">
+            <div class="custom-modal-card" @onclick:stopPropagation="true">
+                <div class="modal-head">
+                    <div style="display:flex;align-items:center;gap:10px">
+                        <span style="font-size:1.5rem">🧾</span>
+                        <div>
+                            <h3 style="margin:0;color:#fff">Oda Folyosuna VIP Tur Ekle</h3>
+                            <small style="color:#94a3b8">Konaklayan misafirin faturasına aktivite ücretini yansıtın</small>
+                        </div>
+                    </div>
+                    <button class="modal-close-btn" @onclick="() => showFolioModal = false">✕</button>
+                </div>
+
+                <div class="modal-body">
+                    @if (folioSuccessMsg != null)
+                    {
+                        <div class="alert ok" style="margin-bottom:12px">@folioSuccessMsg</div>
+                    }
+
+                    <label style="font-size:0.8rem;color:#cbd5e1;font-weight:600">Konaklayan Misafir / Oda Seçin</label>
+                    <select class="custom-select" style="width:100%;margin-top:6px" @bind="selectedFolioReservationId">
+                        <option value="0">Lütfen aktif konaklayan bir oda seçiniz...</option>
+                        @foreach (var res in inHouseGuests)
+                        {
+                            var rm = res.Rooms.FirstOrDefault()?.Room;
+                            <option value="@res.Id">Oda @(rm?.Number ?? "-") · @res.Guest?.FullName (#@res.Code)</option>
+                        }
+                    </select>
+
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px">
+                        <div>
+                            <label style="font-size:0.8rem;color:#cbd5e1;font-weight:600">Kişi Sayısı</label>
+                            <input type="number" min="1" max="10" class="custom-select" style="width:100%;margin-top:6px" @bind="folioGuestCount" />
+                        </div>
+                        <div>
+                            <label style="font-size:0.8rem;color:#cbd5e1;font-weight:600">Toplam Tur Bedeli</label>
+                            <div style="font-size:1.25rem;font-weight:800;color:#34d399;margin-top:10px">
+                                @Fmt.Money(currentPlan.TotalCostPerPerson * folioGuestCount)
+                            </div>
+                        </div>
+                    </div>
+
+                    <div style="margin-top:20px">
+                        <button class="btn primary" style="width:100%;padding:14px;font-weight:700" @onclick="ChargeToRoomFolio" disabled="@(selectedFolioReservationId == 0)">
+                            ✅ Oda Folyosuna Kaydet & İş Emri Aç
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+
+    <!-- 3. AI Tur Rehberine Danışma / Soru-Cevap Modalı -->
+    @if (showAskGuideModal && activeGuideStop != null && currentPlan != null)
+    {
+        <div class="custom-modal-backdrop" @onclick="CloseAskGuideModal">
+            <div class="custom-modal-card ask-guide-modal-card" @onclick:stopPropagation="true">
+                <div class="modal-head">
+                    <div style="display:flex;align-items:center;gap:12px">
+                        <div class="guide-modal-avatar">@currentPlan.Guide.Avatar</div>
+                        <div>
+                            <h3 style="margin:0;color:#fff;font-size:1.1rem">
+                                @currentPlan.Guide.Name ile Canlı Rehberlik
+                            </h3>
+                            <small style="color:#94a3b8">
+                                Seçili Durak: <b style="color:#38bdf8">@activeGuideStop.CategoryIcon @activeGuideStop.Title</b> (@activeGuideStop.TimeSlot)
+                            </small>
+                        </div>
+                    </div>
+                    <button class="modal-close-btn" @onclick="CloseAskGuideModal">✕</button>
+                </div>
+
+                <div class="modal-body">
+                    <!-- Durak Mini Özeti -->
+                    <div class="guide-stop-summary-box">
+                        <img src="@activeGuideStop.ImageUrl" class="guide-stop-img" alt="@activeGuideStop.Title" />
+                        <div>
+                            <div style="font-weight:700;color:#fff;font-size:0.88rem">@activeGuideStop.Title</div>
+                            <div style="font-size:0.75rem;color:#cbd5e1;margin-top:2px">⭐ @activeGuideStop.Specialty</div>
+                            <div style="font-size:0.72rem;color:#34d399;margin-top:3px">💡 @activeGuideStop.ConciergeTip</div>
+                        </div>
+                    </div>
+
+                    <!-- Hızlı Soru Şablonları -->
+                    <div style="margin-top:14px">
+                        <label style="font-size:0.78rem;color:#cbd5e1;font-weight:700;margin-bottom:6px;display:block">Rehbere Hızlı Soru Sorun:</label>
+                        <div class="guide-quick-questions">
+                            <button type="button" class="g-q-chip" @onclick='() => AskGuidePresetQuestion("Bu durak için ne giymeliyim, kıyafet öneriniz nedir?")'>
+                                👔 Ne Giymeliyim?
+                            </button>
+                            <button type="button" class="g-q-chip" @onclick='() => AskGuidePresetQuestion("Önceden rezervasyon veya bilet gerekli mi, otel önceliğimiz var mı?")'>
+                                🎟️ Rezervasyon & Bilet
+                            </button>
+                            <button type="button" class="g-q-chip" @onclick='() => AskGuidePresetQuestion("En iyi fotoğraf ve manzara noktası neresidir?")'>
+                                📸 En İyi Fotoğraf Noktası
+                            </button>
+                            <button type="button" class="g-q-chip" @onclick='() => AskGuidePresetQuestion("Burası çocuklar ve bebek arabası için uygun mu?")'>
+                                👶 Çocuk & Aile Uygunluğu
+                            </button>
+                            <button type="button" class="g-q-chip" @onclick='() => AskGuidePresetQuestion("Otel misafirlerine özel indirim veya karşılama ikramı var mı?")'>
+                                🎁 Otel İkramı & İndirim
+                            </button>
+                            <button type="button" class="g-q-chip" @onclick='() => AskGuidePresetQuestion("Yağmur veya kötü hava durumunda alternatif öneriniz nedir?")'>
+                                🔀 Alternatif / Kötü Hava
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Soru Kutusu -->
+                    <div class="guide-input-row" style="margin-top:14px">
+                        <input type="text" class="custom-select" style="flex:1" placeholder="Örn: Akşam masası için deniz kenarı yer ayrılabilir mi?..." 
+                               @bind="guideCustomQuestion" @bind:event="oninput" @onkeydown="OnGuideQuestionKeyDown" />
+                        <button class="btn primary" @onclick="SubmitGuideCustomQuestion" disabled="@isGuideAnswering" style="padding:10px 18px">
+                            @if (isGuideAnswering)
+                            {
+                                <span>Cevaplanıyor...</span>
+                            }
+                            else
+                            {
+                                <span>Sor</span>
+                            }
+                        </button>
+                    </div>
+
+                    <!-- Rehberin Cevabı -->
+                    @if (!string.IsNullOrWhiteSpace(guideAnswerText))
+                    {
+                        <div class="guide-answer-card">
+                            <div class="guide-answer-head">
+                                <div style="display:flex;align-items:center;gap:8px">
+                                    <span style="font-size:1.2rem">@currentPlan.Guide.Avatar</span>
+                                    <b style="color:#fff;font-size:0.85rem">@currentPlan.Guide.Name'in Rehberlik Tavsiyesi:</b>
+                                </div>
+                                <button class="guide-answer-speech-btn" @onclick="ToggleGuideAnswerSpeech">
+                                    @(isGuideSpeaking ? "⏹️ Durdur" : "🔊 Sesli Dinle")
+                                </button>
+                            </div>
+                            <p class="guide-answer-body">@guideAnswerText</p>
+                        </div>
+                    }
+                </div>
+
+                <div class="modal-footer" style="padding:12px 24px;display:flex;justify-content:flex-end">
+                    <button class="btn sm" @onclick="CloseAskGuideModal">Kapat</button>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    List<Hotel> hotels = new();
+    int selectedHotelId = 1;
+    int selectedDays = 1;
+    string selectedProfile = "romantic";
+    string selectedPace = "relaxed";
+    string selectedBudget = "luxury";
+    DateTime selectedStartDate = DateTime.Today;
+    int selectedAdults = 2;
+    int selectedChildren = 0;
+    string selectedTransport = "vip";
+    List<string> selectedPreferences = new() { "sunset" };
+    string customAiPrompt = "";
+    bool isGenerating = false;
+    bool isSpeaking = false;
+    string mapTheme = "dark";
+    bool isMapExpanded = false;
+
+    TripPlan? currentPlan;
+    int activeDayTab = 1;
+
+    // Modallar
+    bool showWhatsAppModal = false;
+    string targetWhatsAppPhone = "";
+    bool showFolioModal = false;
+    int selectedFolioReservationId = 0;
+    int folioGuestCount = 2;
+    string? folioSuccessMsg = null;
+    List<Reservation> inHouseGuests = new();
+
+    // AI Tur Rehberine Soru Sorma & Bireysel Durak Dinleme
+    bool showAskGuideModal = false;
+    ItineraryStop? activeGuideStop;
+    string guideCustomQuestion = "";
+    string guideAnswerText = "";
+    bool isGuideAnswering = false;
+    bool isGuideSpeaking = false;
+    int? activePlayingStopId = null;
+
+    List<ItineraryStop> ActiveDayStops => currentPlan?.Stops.Where(s => s.Day == activeDayTab).ToList() ?? new();
+
+    string GeneratedWhatsAppText => GetGeneratedWhatsAppText();
+
+    string GetGeneratedWhatsAppText()
+    {
+        if (currentPlan == null) return "";
+        var sb = new System.Text.StringBuilder();
+        sb.AppendLine($"🌟 *{currentPlan.Hotel.Name} - {currentPlan.ProfileTitle}*");
+        var childrenText = currentPlan.Children > 0 ? $" + {currentPlan.Children} Çocuk" : "";
+        sb.AppendLine($"📍 Şehir: {currentPlan.Hotel.City} | ⏱️ {currentPlan.Days} Günlük Plan | 📅 {currentPlan.StartDate:dd MMMM yyyy}");
+        sb.AppendLine($"👥 Misafir: {currentPlan.Adults} Yetişkin{childrenText}");
+        sb.AppendLine($"🚗 Ulaşım: {currentPlan.TransportTitle}");
+        sb.AppendLine($"☀️ Hava Durumu: {currentPlan.Weather.TempC}°C {currentPlan.Weather.Condition}");
+        sb.AppendLine();
+        for (int i = 0; i < ActiveDayStops.Count; i++)
+        {
+            var s = ActiveDayStops[i];
+            sb.AppendLine($"*{i + 1}. {s.TimeSlot}* - {s.CategoryIcon} {s.Title}");
+            sb.AppendLine($"📍 {s.DistanceText} ({s.TransitText})");
+            sb.AppendLine($"⭐ {s.Specialty}");
+            sb.AppendLine($"💡 İpucu: {s.ConciergeTip}");
+            sb.AppendLine($"💰 Tahmini: ~₺{s.EstCost}");
+            sb.AppendLine();
+        }
+        sb.AppendLine($"🎒 *Tavsiyeler:* {string.Join(", ", currentPlan.PackingTips.Take(3))}");
+        sb.AppendLine();
+        sb.AppendLine($"Otel İletişim: {currentPlan.Hotel.Phone ?? "+90 242 000 00 00"}");
+        return sb.ToString();
+    }
+
+    bool mapRenderedOnce = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        hotels = await TripPlanner.GetHotelsAsync();
+        selectedHotelId = HotelState.SelectedHotelId > 0 ? HotelState.SelectedHotelId : (hotels.FirstOrDefault()?.Id ?? 1);
+        
+        // İlk açılışta zengin bir rota otomatik oluşturulsun
+        await GenerateRouteAsync();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender || (!mapRenderedOnce && currentPlan != null))
+        {
+            mapRenderedOnce = true;
+            await Task.Delay(350);
+            await RenderMapAsync();
+        }
+    }
+
+    async Task OnHotelChanged(ChangeEventArgs e)
+    {
+        if (int.TryParse(e.Value?.ToString(), out var newId))
+        {
+            selectedHotelId = newId;
+            await GenerateRouteAsync();
+        }
+    }
+
+    async Task SelectProfileAsync(string profile)
+    {
+        selectedProfile = profile;
+        await GenerateRouteAsync();
+    }
+
+    async Task ChangeDaysAsync(int days)
+    {
+        selectedDays = days;
+        await GenerateRouteAsync();
+    }
+
+    async Task OnPaceChanged(ChangeEventArgs e)
+    {
+        selectedPace = e.Value?.ToString() ?? "relaxed";
+        await GenerateRouteAsync();
+    }
+
+    async Task OnBudgetChanged(ChangeEventArgs e)
+    {
+        selectedBudget = e.Value?.ToString() ?? "luxury";
+        await GenerateRouteAsync();
+    }
+
+    async Task OnStartDateChanged(ChangeEventArgs e)
+    {
+        if (DateTime.TryParse(e.Value?.ToString(), out var d))
+        {
+            selectedStartDate = d;
+            await GenerateRouteAsync();
+        }
+    }
+
+    async Task OnAdultsChanged(ChangeEventArgs e)
+    {
+        if (int.TryParse(e.Value?.ToString(), out var a))
+        {
+            selectedAdults = a;
+            folioGuestCount = a + selectedChildren;
+            await GenerateRouteAsync();
+        }
+    }
+
+    async Task OnChildrenChanged(ChangeEventArgs e)
+    {
+        if (int.TryParse(e.Value?.ToString(), out var c))
+        {
+            selectedChildren = c;
+            folioGuestCount = selectedAdults + c;
+            await GenerateRouteAsync();
+        }
+    }
+
+    async Task OnTransportChanged(ChangeEventArgs e)
+    {
+        selectedTransport = e.Value?.ToString() ?? "vip";
+        await GenerateRouteAsync();
+    }
+
+    async Task TogglePreference(string key)
+    {
+        if (selectedPreferences.Contains(key))
+            selectedPreferences.Remove(key);
+        else
+            selectedPreferences.Add(key);
+
+        await GenerateRouteAsync();
+    }
+
+    async Task ApplyQuickPrompt(string text)
+    {
+        customAiPrompt = text;
+        await GenerateRouteAsync();
+    }
+
+    async Task OnPromptKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+        {
+            await GenerateRouteAsync();
+        }
+    }
+
+    async Task GenerateRouteAsync()
+    {
+        isGenerating = true;
+        StateHasChanged();
+
+        await Task.Delay(350); // Şık AI hesaplama efekti
+        currentPlan = await TripPlanner.GenerateItineraryAsync(
+            selectedHotelId, 
+            selectedProfile, 
+            selectedDays, 
+            selectedPace, 
+            selectedBudget,
+            selectedStartDate,
+            selectedAdults,
+            selectedChildren,
+            selectedTransport,
+            selectedPreferences,
+            customAiPrompt);
+
+        activeDayTab = 1;
+        isGenerating = false;
+        StateHasChanged();
+
+        await Task.Delay(150);
+        await RenderMapAsync();
+    }
+
+    async Task SwitchDayTab(int dayNum)
+    {
+        activeDayTab = dayNum;
+        StateHasChanged();
+        await Task.Delay(100);
+        await RenderMapAsync();
+    }
+
+    async Task RenderMapAsync()
+    {
+        if (currentPlan == null) return;
+        var stops = ActiveDayStops;
+        try
+        {
+            await JS.InvokeVoidAsync("renderTripItineraryRoute", 
+                "tripPlannerMap", 
+                currentPlan.Hotel.Latitude ?? 36.855, 
+                currentPlan.Hotel.Longitude ?? 30.795, 
+                currentPlan.Hotel.Name, 
+                stops);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Trip planner map error: {ex.Message}");
+        }
+    }
+
+    async Task FocusStopOnMap(ItineraryStop stop)
+    {
+        await JS.InvokeVoidAsync("focusTripPlannerStop", stop.Latitude, stop.Longitude, 16, stop.Id);
+    }
+
+    async Task ResetMapZoom()
+    {
+        await JS.InvokeVoidAsync("fitTripPlannerBounds");
+    }
+
+    async Task ChangeMapTheme(string theme)
+    {
+        mapTheme = theme;
+        await JS.InvokeVoidAsync("setTripPlannerMapTheme", theme);
+    }
+
+    async Task ToggleMapExpand()
+    {
+        isMapExpanded = !isMapExpanded;
+        StateHasChanged();
+        await Task.Delay(250);
+        await JS.InvokeVoidAsync("invalidateTripPlannerMap");
+        await JS.InvokeVoidAsync("fitTripPlannerBounds");
+    }
+
+    async Task ToggleSpeechAsync()
+    {
+        if (isSpeaking)
+        {
+            isSpeaking = false;
+            await JS.InvokeVoidAsync("stopSpeech");
+        }
+        else
+        {
+            if (currentPlan == null) return;
+            isSpeaking = true;
+            var text = $"{currentPlan.Hotel.Name} için {activeDayTab}. gün rotası başlıyor. {currentPlan.ProfileTitle}. Bugün {ActiveDayStops.Count} seçkin durağımız var. ";
+            foreach (var stop in ActiveDayStops)
+            {
+                text += $"Saat {stop.TimeSlot}, {stop.Title}. {stop.Specialty}. ";
+            }
+            text += $"Hava durumu {currentPlan.Weather.TempC} derece ve {currentPlan.Weather.Condition}. Harika bir tatil dileriz.";
+            await JS.InvokeVoidAsync("playSpeechText", text);
+        }
+    }
+
+    async Task DownloadIcsCalendar()
+    {
+        if (currentPlan == null) return;
+        var sb = new System.Text.StringBuilder();
+        sb.AppendLine("BEGIN:VCALENDAR");
+        sb.AppendLine("VERSION:2.0");
+        sb.AppendLine("PRODID:-//OtelPro//AI Trip Planner//TR");
+        sb.AppendLine("CALSCALE:GREGORIAN");
+        sb.AppendLine("METHOD:PUBLISH");
+
+        var planDate = selectedStartDate;
+        foreach (var stop in currentPlan.Stops)
+        {
+            var dayOffset = Math.Max(0, stop.Day - 1);
+            var date = planDate.AddDays(dayOffset);
+            
+            var times = stop.TimeSlot.Split('-');
+            var startTimeStr = times.Length > 0 ? times[0].Trim() : "09:00";
+            var endTimeStr = times.Length > 1 ? times[1].Trim() : "11:00";
+            
+            DateTime startDt = date.Date;
+            if (TimeSpan.TryParse(startTimeStr, out var ts1)) startDt = startDt.Add(ts1);
+            else startDt = startDt.AddHours(9);
+
+            DateTime endDt = date.Date;
+            if (TimeSpan.TryParse(endTimeStr, out var ts2)) endDt = endDt.Add(ts2);
+            else endDt = endDt.AddHours(11);
+
+            sb.AppendLine("BEGIN:VEVENT");
+            sb.AppendLine($"UID:trip-{currentPlan.Hotel.Id}-{stop.Id}-{Guid.NewGuid():N}@otelpro.com");
+            sb.AppendLine($"DTSTAMP:{DateTime.UtcNow:yyyyMMddTHHmmssZ}");
+            sb.AppendLine($"DTSTART:{startDt:yyyyMMddTHHmmss}");
+            sb.AppendLine($"DTEND:{endDt:yyyyMMddTHHmmss}");
+            sb.AppendLine($"SUMMARY:{EscapeIcs(stop.CategoryIcon + " " + stop.Title)}");
+            sb.AppendLine($"DESCRIPTION:{EscapeIcs(stop.Description + "\n⭐ " + stop.Specialty + "\n💡 Concierge: " + stop.ConciergeTip)}");
+            sb.AppendLine($"LOCATION:{EscapeIcs(stop.Address)}");
+            sb.AppendLine($"GEO:{stop.Latitude:F6};{stop.Longitude:F6}");
+            sb.AppendLine("STATUS:CONFIRMED");
+            sb.AppendLine("END:VEVENT");
+        }
+
+        sb.AppendLine("END:VCALENDAR");
+        var filename = $"OtelPro_Tatil_Plani_{currentPlan.Hotel.City}_{DateTime.Now:yyyyMMdd}.ics";
+        await JS.InvokeVoidAsync("downloadIcsFile", filename, sb.ToString());
+    }
+
+    static string EscapeIcs(string text)
+    {
+        if (string.IsNullOrEmpty(text)) return "";
+        return text.Replace("\\", "\\\\").Replace(";", "\\;").Replace(",", "\\,").Replace("\n", "\\n").Replace("\r", "");
+    }
+
+    void OpenWhatsAppModal()
+    {
+        showWhatsAppModal = true;
+    }
+
+    async Task CopyWhatsAppText()
+    {
+        await JS.InvokeVoidAsync("navigator.clipboard.writeText", GeneratedWhatsAppText);
+    }
+
+    async Task OpenFolioModal()
+    {
+        folioSuccessMsg = null;
+        showFolioModal = true;
+        try
+        {
+            inHouseGuests = await BookingSvc.GetInHouseReservationsAsync(selectedHotelId);
+            if (inHouseGuests.Count > 0 && selectedFolioReservationId == 0)
+            {
+                selectedFolioReservationId = inHouseGuests[0].Id;
+            }
+        }
+        catch { }
+    }
+
+    async Task ChargeToRoomFolio()
+    {
+        if (selectedFolioReservationId == 0 || currentPlan == null) return;
+
+        var res = inHouseGuests.FirstOrDefault(r => r.Id == selectedFolioReservationId);
+        if (res?.Folio != null)
+        {
+            var total = currentPlan.TotalCostPerPerson * folioGuestCount;
+            await BookingSvc.AddChargeAsync(res.Folio.Id, $"VIP AI Gezi Programı ({currentPlan.ProfileTitle} - {folioGuestCount} Kişi)", ChargeCategory.Other, 1, total, 20);
+            folioSuccessMsg = $"✅ {Fmt.Money(total)} tutarındaki gezi paketi {res.Guest?.FullName} folyosuna başarıyla işlendi!";
+            StateHasChanged();
+        }
+    }
+
+    async Task PrintItinerary()
+    {
+        await JS.InvokeVoidAsync("window.print");
+    }
+
+    void OpenAskGuideModal(ItineraryStop? stop)
+    {
+        activeGuideStop = stop ?? ActiveDayStops.FirstOrDefault();
+        guideCustomQuestion = "";
+        guideAnswerText = "";
+        isGuideSpeaking = false;
+        showAskGuideModal = true;
+    }
+
+    void CloseAskGuideModal()
+    {
+        showAskGuideModal = false;
+        if (isGuideSpeaking)
+        {
+            isGuideSpeaking = false;
+            _ = JS.InvokeVoidAsync("stopSpeech");
+        }
+    }
+
+    async Task AskGuidePresetQuestion(string question)
+    {
+        guideCustomQuestion = question;
+        await SubmitGuideCustomQuestion();
+    }
+
+    async Task SubmitGuideCustomQuestion()
+    {
+        if (activeGuideStop == null || currentPlan == null || string.IsNullOrWhiteSpace(guideCustomQuestion)) return;
+        isGuideAnswering = true;
+        StateHasChanged();
+
+        await Task.Delay(250);
+        guideAnswerText = await TripPlanner.AskGuideAboutStopAsync(currentPlan.Guide, activeGuideStop, guideCustomQuestion, currentPlan);
+        isGuideAnswering = false;
+        StateHasChanged();
+    }
+
+    async Task OnGuideQuestionKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+        {
+            await SubmitGuideCustomQuestion();
+        }
+    }
+
+    async Task ToggleGuideAnswerSpeech()
+    {
+        if (isGuideSpeaking)
+        {
+            isGuideSpeaking = false;
+            await JS.InvokeVoidAsync("stopSpeech");
+        }
+        else
+        {
+            if (string.IsNullOrWhiteSpace(guideAnswerText) || currentPlan == null) return;
+            isGuideSpeaking = true;
+            var text = $"{currentPlan.Guide.Name} aktarıyor: {guideAnswerText}";
+            await JS.InvokeVoidAsync("playSpeechText", text);
+        }
+    }
+
+    async Task PlayStopSpeech(ItineraryStop stop)
+    {
+        if (activePlayingStopId == stop.Id)
+        {
+            activePlayingStopId = null;
+            await JS.InvokeVoidAsync("stopSpeech");
+        }
+        else
+        {
+            activePlayingStopId = stop.Id;
+            var text = $"{stop.Title}. {stop.CategoryName}. Saat {stop.TimeSlot}. Bu durakta: {stop.Specialty}. Rehber tüyosu: {stop.ConciergeTip}. Tahmini bütçe kişi başı yaklaşık {stop.EstCost} Türk Lirası.";
+            await JS.InvokeVoidAsync("playSpeechText", text);
+        }
+    }
+
+    static string FormatWhatsApp(string phone)
+    {
+        if (string.IsNullOrWhiteSpace(phone)) return "";
+        var digits = new string(phone.Where(char.IsDigit).ToArray());
+        if (digits.StartsWith("0")) digits = "90" + digits.Substring(1);
+        if (!digits.StartsWith("90") && digits.Length == 10) digits = "90" + digits;
+        return digits;
+    }
+}

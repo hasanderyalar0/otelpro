@@ -1,0 +1,24 @@
+{
+  "name": "OtelPro Mobil - Otel Sahibi & Yönetici Paneli",
+  "short_name": "OtelPro Mobil",
+  "description": "Otel sahipleri ve yöneticileri için anlık doluluk, ciro, oda kontrolü ve rezervasyon takip mobil uygulaması.",
+  "start_url": "/mobile",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#060b13",
+  "theme_color": "#0ea5e9",
+  "icons": [
+    {
+      "src": "/images/room_suite.jpg",
+      "sizes": "192x192",
+      "type": "image/jpeg",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/images/room_suite.jpg",
+      "sizes": "512x512",
+      "type": "image/jpeg",
+      "purpose": "any maskable"
+    }
+  ]
+}

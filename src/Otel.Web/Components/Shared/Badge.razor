@@ -1,0 +1,7 @@
+@* Durum rozeti: prefix.Value anahtarı yerelleştirilir *@
+<span class="badge b-@Value">@L[Prefix + "." + Value]</span>
+
+@code {
+    [Parameter] public string Prefix { get; set; } = "st";
+    [Parameter] public string Value { get; set; } = "";
+}

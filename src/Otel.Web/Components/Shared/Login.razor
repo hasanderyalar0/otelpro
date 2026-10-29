@@ -1,0 +1,122 @@
+@inject AuthService Auth
+@implements IDisposable
+
+<div class="login-wrap">
+    <div class="login-art">
+        <div class="brand" style="padding-left:0">
+            <div class="brand-logo">🏨</div>
+            <div><b>OtelPro</b><small>HOTEL MANAGEMENT & CAREERS</small></div>
+        </div>
+        <h1>@(L.Lang == "tr" ? "Bulut Tabanlı Otel Yönetim Sistemi ve Personel Portalı." : "Cloud Hotel Management System & Hospitality Staff Portal.")</h1>
+        <p>@(L.Lang == "tr" ? "Otel sahipleri, iş arayan çalışanlar ve misafirler için eksiksiz turizm ekosistemi." : "The complete hospitality ecosystem for hotel owners, job seekers, and guests.")</p>
+
+        <!-- 3 Kitle Hızlı Erişim Kartları -->
+        <div class="portal-quick-cards">
+            <a href="/pricing" class="portal-qcard">
+                <span class="qcard-icon">🏨</span>
+                <div>
+                    <b>Otel Sahipleri & İşletmeciler</b>
+                    <small>Oda sayısına göre fiyat hesaplayın, modülleri inceleyin →</small>
+                </div>
+            </a>
+
+            <a href="/jobs" class="portal-qcard">
+                <span class="qcard-icon">👨‍🍳</span>
+                <div>
+                    <b>İş Arayanlar & Personel</b>
+                    <small>Garson, komi, kat hizmetleri ilanları ve hızlı başvuru →</small>
+                </div>
+            </a>
+
+            <a href="/book" class="portal-qcard">
+                <span class="qcard-icon">🛎️</span>
+                <div>
+                    <b>Misafirler & Müşteriler</b>
+                    <small>Komisyonsuz doğrudan online oda rezervasyonu yapın →</small>
+                </div>
+            </a>
+        </div>
+    </div>
+    <div class="login-form">
+        <div class="login-card">
+            <div class="row" style="justify-content:flex-end;margin-bottom:14px">
+                <div class="lang">
+                    <button class="@(L.Lang=="tr"?"on":"")" @onclick='() => L.SetAsync("tr")'>TR</button>
+                    <button class="@(L.Lang=="en"?"on":"")" @onclick='() => L.SetAsync("en")'>EN</button>
+                </div>
+            </div>
+            <div class="card">
+                <h1>@L["login.title"]</h1>
+                <p class="muted" style="margin:6px 0 22px">@L["login.sub"]</p>
+                @if (error) { <div class="alert bad">@L["login.error"]</div> }
+                <form @onsubmit="DoLogin" @onsubmit:preventDefault>
+                    <label class="f">@L["login.user"]</label>
+                    <input id="login-user" @bind="user" autocomplete="username" />
+                    <label class="f" style="margin-top:14px">@L["login.pass"]</label>
+                    <input id="login-pass" type="password" @bind="pass" autocomplete="current-password" />
+                    <button id="login-btn" class="btn primary" style="width:100%;justify-content:center;margin-top:22px" disabled="@busy">@L["login.btn"]</button>
+                </form>
+                <div class="demo">
+                    @L["login.demo"]: <code @onclick='() => Fill("admin","admin123")'>admin / admin123</code>
+                    <code @onclick='() => Fill("onburo","onburo123")'>onburo / onburo123</code>
+                    <code @onclick='() => Fill("muhasebe","muhasebe123")'>muhasebe / muhasebe123</code>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.portal-quick-cards {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-top: 24px;
+    max-width: 480px;
+}
+.portal-qcard {
+    background: rgba(30, 41, 59, 0.6);
+    border: 1px solid rgba(51, 65, 85, 0.7);
+    border-radius: 14px;
+    padding: 12px 16px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    text-decoration: none;
+    color: #f1f5f9;
+    transition: all 0.2s ease;
+}
+.portal-qcard:hover {
+    background: rgba(14, 165, 233, 0.15);
+    border-color: #38bdf8;
+    transform: translateX(4px);
+}
+.qcard-icon {
+    font-size: 1.8rem;
+    flex-shrink: 0;
+}
+.portal-qcard b {
+    display: block;
+    font-size: 0.95rem;
+    color: #fff;
+    margin-bottom: 2px;
+}
+.portal-qcard small {
+    display: block;
+    font-size: 0.8rem;
+    color: #94a3b8;
+    line-height: 1.3;
+}
+</style>
+
+@code {
+    string user = "", pass = ""; bool error, busy;
+    protected override void OnInitialized() => L.Changed += Refresh;
+    void Refresh() => InvokeAsync(StateHasChanged);
+    public void Dispose() => L.Changed -= Refresh;
+    void Fill(string u, string p) { user = u; pass = p; }
+    async Task DoLogin()
+    {
+        busy = true; error = !await Auth.LoginAsync(user.Trim(), pass); busy = false;
+    }
+}

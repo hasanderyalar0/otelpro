@@ -1,0 +1,179 @@
+@page "/guests"
+@inject AppDb Db
+
+<div class="page-head">
+    <div>
+        <div style="display:flex;align-items:center;gap:10px">
+            <h1>@L["nav.guests"]</h1>
+            <span class="badge b-ok" style="font-size:0.85rem">🏢 @(CurrentHotelState.SelectedHotel?.Name ?? "Tesis")</span>
+        </div>
+        <p>@(L.Lang == "tr" ? $"{CurrentHotelState.SelectedHotel?.Name} misafir veritabanı, sadakat puanları ve konaklama geçmişi" : "Guest database, loyalty points, and blacklist records")</p>
+    </div>
+    <div class="row">
+        <input class="search" placeholder="@L["c.search"]" @bind="search" @bind:event="oninput" @bind:after="LoadGuests" />
+        <button class="btn primary sm" @onclick="OpenNewGuest">＋ @(L.Lang == "tr" ? "Yeni Misafir" : "New Guest")</button>
+    </div>
+</div>
+
+<div class="card" style="padding:6px">
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th>@L["c.name"]</th>
+                    <th>Uyruk</th>
+                    <th>İletişim</th>
+                    <th>Sadakat Puanı</th>
+                    <th>VIP</th>
+                    <th>Kara Liste</th>
+                    <th>@L["c.actions"]</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var g in guests)
+                {
+                    var isBlack = blacklistIds.Contains(g.Id);
+                    <tr>
+                        <td><b>@g.FullName</b></td>
+                        <td>@g.Nationality</td>
+                        <td>
+                            <div>@(g.Phone ?? "-")</div>
+                            <small class="muted">@(g.Email ?? "-")</small>
+                        </td>
+                        <td>⭐ @g.LoyaltyPoints Puan</td>
+                        <td>@(g.IsVip ? "👑 VIP" : "Standart")</td>
+                        <td>
+                            @if (isBlack)
+                            {
+                                <span class="badge b-bad">⛔ Kara Listede</span>
+                            }
+                            else
+                            {
+                                <span class="badge b-ok">Temiz</span>
+                            }
+                        </td>
+                        <td>
+                            <button class="btn sm" @onclick="() => EditGuest(g)">Detay</button>
+                            @if (isBlack)
+                            {
+                                <button class="btn sm" @onclick="() => RemoveFromBlacklist(g.Id)">Listeden Çıkar</button>
+                            }
+                            else
+                            {
+                                <button class="btn sm danger" @onclick="() => AddToBlacklist(g.Id)">Kara Listeye Al</button>
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<Modal Show="showModal" ShowChanged="(v) => showModal = v" Title="@(editingGuest.Id == 0 ? "Yeni Misafir Kartı" : $"Misafir: {editingGuest.FullName}")">
+    <div class="form-grid">
+        <div>
+            <label class="f">Ad (*)</label>
+            <input @bind="editingGuest.FirstName" />
+        </div>
+        <div>
+            <label class="f">Soyad (*)</label>
+            <input @bind="editingGuest.LastName" />
+        </div>
+        <div>
+            <label class="f">Telefon</label>
+            <input @bind="editingGuest.Phone" />
+        </div>
+        <div>
+            <label class="f">E-Posta</label>
+            <input @bind="editingGuest.Email" />
+        </div>
+        <div>
+            <label class="f">Uyruk</label>
+            <input @bind="editingGuest.Nationality" />
+        </div>
+        <div>
+            <label class="f">Sadakat Puanı</label>
+            <input type="number" @bind="editingGuest.LoyaltyPoints" />
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;padding-top:20px">
+            <input type="checkbox" id="vipChk" @bind="editingGuest.IsVip" />
+            <label for="vipChk" style="cursor:pointer">VIP Misafir</label>
+        </div>
+    </div>
+    <div class="row mt" style="justify-content:flex-end">
+        <button class="btn primary" @onclick="SaveGuest">Kaydet</button>
+    </div>
+</Modal>
+
+@code {
+    List<Guest> guests = new();
+    HashSet<int> blacklistIds = new();
+    string search = "";
+
+    bool showModal;
+    Guest editingGuest = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadGuests();
+    }
+
+    async Task LoadGuests()
+    {
+        var q = Db.Guests.AsNoTracking().AsQueryable();
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            q = q.Where(g => g.FirstName.Contains(search) || g.LastName.Contains(search) || (g.Phone != null && g.Phone.Contains(search)));
+        }
+        guests = await q.OrderByDescending(g => g.Id).Take(100).ToListAsync();
+
+        var bList = await Db.Blacklist.Select(b => b.GuestId).ToListAsync();
+        blacklistIds = new HashSet<int>(bList);
+    }
+
+    void OpenNewGuest()
+    {
+        editingGuest = new Guest();
+        showModal = true;
+    }
+
+    void EditGuest(Guest g)
+    {
+        editingGuest = g;
+        showModal = true;
+    }
+
+    async Task SaveGuest()
+    {
+        if (editingGuest.Id == 0)
+        {
+            Db.Guests.Add(editingGuest);
+        }
+        else
+        {
+            Db.Guests.Update(editingGuest);
+        }
+        await Db.SaveChangesAsync();
+        showModal = false;
+        await LoadGuests();
+    }
+
+    async Task AddToBlacklist(int guestId)
+    {
+        Db.Blacklist.Add(new BlacklistEntry { GuestId = guestId, Reason = "Otel kurallarına uyulmadı." });
+        await Db.SaveChangesAsync();
+        await LoadGuests();
+    }
+
+    async Task RemoveFromBlacklist(int guestId)
+    {
+        var item = await Db.Blacklist.FirstOrDefaultAsync(b => b.GuestId == guestId);
+        if (item != null)
+        {
+            Db.Blacklist.Remove(item);
+            await Db.SaveChangesAsync();
+        }
+        await LoadGuests();
+    }
+}

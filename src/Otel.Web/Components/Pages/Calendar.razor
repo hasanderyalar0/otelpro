@@ -1,0 +1,120 @@
+@page "/calendar"
+@inject AppDb Db
+
+<div class="page-head">
+    <div>
+        <div style="display:flex;align-items:center;gap:10px">
+            <h1>@L["nav.calendar"]</h1>
+            <span class="badge b-ok" style="font-size:0.85rem">🏢 @(CurrentHotelState.SelectedHotel?.Name ?? "Tesis")</span>
+        </div>
+        <p>@(L.Lang == "tr" ? $"{CurrentHotelState.SelectedHotel?.Name} aylık oda doluluk ve rezervasyon çizelgesi (Tape Chart)" : "Monthly room reservation tape chart")</p>
+    </div>
+    <div class="row">
+        <button class="btn sm" @onclick="PrevMonth">◀ @(L.Lang == "tr" ? "Önceki" : "Prev")</button>
+        <b>@currentMonth.ToString("MMMM yyyy", L.Culture)</b>
+        <button class="btn sm" @onclick="NextMonth">@(L.Lang == "tr" ? "Sonraki" : "Next") ▶</button>
+    </div>
+</div>
+
+<div class="cal">
+    <table>
+        <thead>
+            <tr>
+                <th style="min-width:140px;text-align:left;padding-left:12px">@L["c.room"]</th>
+                @for (int day = 1; day <= daysInMonth; day++)
+                {
+                    var dt = new DateTime(currentMonth.Year, currentMonth.Month, day);
+                    var isToday = dt == DateTime.Today;
+                    <th class="@(isToday ? "today" : "")">
+                        <div>@day</div>
+                        <div style="font-size:0.65rem;opacity:0.7">@dt.ToString("ddd", L.Culture)</div>
+                    </th>
+                }
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var r in rooms)
+            {
+                <tr>
+                    <td class="rn">
+                        <div><b>@r.Number</b> <span class="muted" style="font-size:0.75rem">(@r.RoomType?.Name)</span></div>
+                    </td>
+                    @for (int day = 1; day <= daysInMonth; day++)
+                    {
+                        var dt = new DateTime(currentMonth.Year, currentMonth.Month, day);
+                        var isWeekend = dt.DayOfWeek == DayOfWeek.Saturday || dt.DayOfWeek == DayOfWeek.Sunday;
+                        var cellClass = isWeekend ? "c wk" : "c";
+
+                        var item = resRooms.FirstOrDefault(rr => rr.RoomId == r.Id && rr.CheckIn <= dt && rr.CheckOut > dt);
+
+                        <td class="@cellClass" @onclick="() => OnCellClick(item?.ReservationId)">
+                            @if (item != null && item.Reservation != null)
+                            {
+                                var isStart = item.CheckIn.Date == dt.Date;
+                                <span class="res s-@item.Reservation.Status" title="@item.Reservation.Code - @item.Reservation.Guest?.FullName">
+                                    @(isStart ? $"{item.Reservation.Guest?.LastName} ({item.Reservation.Code})" : "—")
+                                </span>
+                            }
+                        </td>
+                    }
+                </tr>
+            }
+        </tbody>
+    </table>
+</div>
+
+<ReservationDetail Id="selectedResId" @bind-Show="showModal" OnChanged="LoadMonthData" />
+
+@code {
+    DateTime currentMonth = new DateTime(DateTime.Today.Year, DateTime.Today.Month, 1);
+    int daysInMonth => DateTime.DaysInMonth(currentMonth.Year, currentMonth.Month);
+    List<Room> rooms = new();
+    List<ReservationRoom> resRooms = new();
+
+    int selectedResId;
+    bool showModal;
+
+    protected override async Task OnInitializedAsync()
+    {
+        int hId = CurrentHotelState.SelectedHotelId;
+        rooms = await Db.Rooms.Where(r => r.HotelId == hId).Include(r => r.RoomType).OrderBy(r => r.Number).ToListAsync();
+        await LoadMonthData();
+    }
+
+    async Task LoadMonthData()
+    {
+        int hId = CurrentHotelState.SelectedHotelId;
+        var start = currentMonth;
+        var end = currentMonth.AddMonths(1);
+
+        resRooms = await Db.ReservationRooms
+            .Include(rr => rr.Reservation).ThenInclude(r => r!.Guest)
+            .Where(rr => rr.RoomId != null
+                && rr.Room!.HotelId == hId
+                && rr.Reservation!.Status != ResStatus.Cancelled
+                && rr.Reservation.Status != ResStatus.NoShow
+                && rr.CheckIn < end && rr.CheckOut > start)
+            .ToListAsync();
+    }
+
+    async Task PrevMonth()
+    {
+        currentMonth = currentMonth.AddMonths(-1);
+        await LoadMonthData();
+    }
+
+    async Task NextMonth()
+    {
+        currentMonth = currentMonth.AddMonths(1);
+        await LoadMonthData();
+    }
+
+    void OnCellClick(int? resId)
+    {
+        if (resId.HasValue)
+        {
+            selectedResId = resId.Value;
+            showModal = true;
+        }
+    }
+}

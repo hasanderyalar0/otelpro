@@ -1,0 +1,131 @@
+@page "/stock"
+@inject AppDb Db
+
+<div class="page-head">
+    <div>
+        <h1>@L["nav.stock"]</h1>
+        <p>@(L.Lang == "tr" ? "Otel İkram, Minibar ve Buklet Malzemeleri Stok Takibi" : "Inventory, stock levels and movements")</p>
+    </div>
+    <div class="row">
+        <button class="btn primary sm" @onclick="OpenAddModal">＋ Yeni Stok Kartı</button>
+    </div>
+</div>
+
+<div class="card" style="padding:6px">
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th>Ürün Adı</th>
+                    <th>Birim</th>
+                    <th class="num">Mevcut Miktar</th>
+                    <th class="num">Kritik Eşik</th>
+                    <th class="num">Birim Maliyet</th>
+                    <th>Durum</th>
+                    <th>İşlem</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var s in items)
+                {
+                    var isLow = s.Quantity < s.MinQuantity;
+                    <tr>
+                        <td><b>@s.Name</b></td>
+                        <td>@s.Unit</td>
+                        <td class="num"><b>@s.Quantity</b></td>
+                        <td class="num">@s.MinQuantity</td>
+                        <td class="num">@Fmt.Money(s.UnitCost)</td>
+                        <td>
+                            @if (isLow)
+                            {
+                                <span class="badge b-bad">Kritik Seviye</span>
+                            }
+                            else
+                            {
+                                <span class="badge b-ok">Yeterli</span>
+                            }
+                        </td>
+                        <td>
+                            <div class="row">
+                                <button class="btn sm" @onclick="() => AdjustStock(s, 10)">+10 Giriş</button>
+                                <button class="btn sm" @onclick="() => AdjustStock(s, -5)">-5 Çıkış</button>
+                            </div>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<Modal Show="showModal" ShowChanged="(v) => showModal = v" Title="Yeni Stok Kartı Ekle">
+    <div class="form-grid">
+        <div>
+            <label class="f">Malzeme Adı</label>
+            <input @bind="newItem.Name" />
+        </div>
+        <div>
+            <label class="f">Birim</label>
+            <input @bind="newItem.Unit" placeholder="adet, kutu, kg..." />
+        </div>
+        <div>
+            <label class="f">Başlangıç Miktarı</label>
+            <input type="number" @bind="newItem.Quantity" />
+        </div>
+        <div>
+            <label class="f">Minimum Uyarı Eşiği</label>
+            <input type="number" @bind="newItem.MinQuantity" />
+        </div>
+        <div>
+            <label class="f">Birim Maliyet (₺)</label>
+            <input type="number" @bind="newItem.UnitCost" />
+        </div>
+    </div>
+    <div class="row mt" style="justify-content:flex-end">
+        <button class="btn primary" @onclick="SaveNewItem">Kaydet</button>
+    </div>
+</Modal>
+
+@code {
+    List<StockItem> items = new();
+    bool showModal;
+    StockItem newItem = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadStock();
+    }
+
+    async Task LoadStock()
+    {
+        items = await Db.StockItems.OrderBy(s => s.Name).ToListAsync();
+    }
+
+    void OpenAddModal()
+    {
+        newItem = new StockItem { Unit = "adet", MinQuantity = 50, UnitCost = 10 };
+        showModal = true;
+    }
+
+    async Task SaveNewItem()
+    {
+        if (string.IsNullOrWhiteSpace(newItem.Name)) return;
+        Db.StockItems.Add(newItem);
+        await Db.SaveChangesAsync();
+        showModal = false;
+        await LoadStock();
+    }
+
+    async Task AdjustStock(StockItem s, int diff)
+    {
+        Db.StockMovements.Add(new StockMovement
+        {
+            StockItemId = s.Id,
+            Quantity = Math.Abs(diff),
+            Type = diff > 0 ? StockMoveType.In : StockMoveType.Out,
+            Note = "Panel üzerinden hızlı stok güncelleme"
+        });
+        await Db.SaveChangesAsync();
+        await LoadStock();
+    }
+}

@@ -1,0 +1,1035 @@
+@page "/pricing"
+@page "/fiyatlandirma"
+@layout Otel.Web.Components.Layout.PublicLayout
+@inject NavigationManager Nav
+@inject AuthService Auth
+
+<div class="pricing-page">
+    <!-- Hero Bölümü -->
+    <section class="pricing-hero">
+        <div class="pricing-badge">
+            <span class="pulse-dot"></span> Bulut Tabanlı Otel Yazılımı & Kanal Yöneticisi
+        </div>
+        <h1>Tesisinizin İhtiyacına Göre<br/><span class="gradient-text">Oda Sayısına Göre Şeffaf Fiyatlandırma</span></h1>
+        <p class="hero-desc">
+            Gizli maliyet veya sürpriz yok. Kurulum ücreti yok, kanal yöneticisi fiyata dahil, sınırsız kullanıcı ve 7/24 kesintisiz teknik destek.
+        </p>
+
+        <div class="hero-trust-row">
+            <div class="trust-item"><span class="icon">✔</span> Kurulum Ücretsiz</div>
+            <div class="trust-item"><span class="icon">✔</span> Kanal Yöneticisi Dahil</div>
+            <div class="trust-item"><span class="icon">✔</span> Sınırsız Kullanıcı & Cihaz</div>
+            <div class="trust-item"><span class="icon">✔</span> EGM / KBS Kimlik Bildirimi Dahil</div>
+        </div>
+    </section>
+
+    <!-- İnteraktif Oda Fiyatı Hesaplayıcı -->
+    <section class="calc-section">
+        <div class="calc-card">
+            <div class="calc-header">
+                <div>
+                    <h2>Oda Sayınızı Seçin, Fiyatınızı Anında Görün</h2>
+                    <p class="muted">Tesisinizdeki toplam oda sayısını belirleyin; ihtiyacınıza uygun paketi hemen hesaplayalım.</p>
+                </div>
+                <!-- Faturalandırma Döngüsü -->
+                <div class="cycle-toggle">
+                    <button class="cycle-btn @(!isAnnual ? "active" : "")" @onclick="() => isAnnual = false">Aylık Ödeme</button>
+                    <button class="cycle-btn @(isAnnual ? "active" : "")" @onclick="() => isAnnual = true">
+                        Yıllık Ödeme <span class="discount-pill">%17 İndirim (2 Ay Hediye)</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Kaydırıcı (Slider) ve Hızlı Butonlar -->
+            <div class="slider-box">
+                <div class="slider-val-row">
+                    <span class="label">Mevcut / Hedef Oda Sayısı:</span>
+                    <div class="number-badge">
+                        <span class="num">@roomCount</span> <small>ODA</small>
+                    </div>
+                </div>
+
+                <input type="range" class="room-range" min="1" max="150" step="1" @bind="roomCount" @bind:event="oninput" />
+
+                <div class="slider-marks">
+                    <span>1 Oda</span>
+                    <span>10 Oda</span>
+                    <span>25 Oda</span>
+                    <span>50 Oda</span>
+                    <span>100 Oda</span>
+                    <span>150+ Oda</span>
+                </div>
+
+                <!-- Hızlı Seçim Butonları -->
+                <div class="quick-presets">
+                    <button class="preset-btn @(roomCount == 6 ? "sel" : "")" @onclick="() => roomCount = 6">🛏️ 6 Oda (Butik Pansiyon)</button>
+                    <button class="preset-btn @(roomCount == 18 ? "sel" : "")" @onclick="() => roomCount = 18">🏨 18 Oda (Orta Ölçek)</button>
+                    <button class="preset-btn @(roomCount == 40 ? "sel" : "")" @onclick="() => roomCount = 40">🌴 40 Oda (Resort & Spa)</button>
+                    <button class="preset-btn @(roomCount == 90 ? "sel" : "")" @onclick="() => roomCount = 90">🏛️ 90 Oda (Büyük Tesis)</button>
+                </div>
+            </div>
+
+            <!-- Hesaplanan Fiyat Özeti -->
+            <div class="calc-result-grid">
+                <div class="result-price-box">
+                    <div class="tier-name">
+                        <span class="tag">@GetTierName(roomCount)</span>
+                    </div>
+                    <div class="price-display">
+                        <span class="currency">₺</span>
+                        <span class="amount">@GetCalculatedPriceTl().ToString("N0")</span>
+                        <span class="period">/ @(isAnnual ? "ay (yıllık peşin)" : "ay")</span>
+                    </div>
+                    <div class="eur-equivalent">
+                        Yaklaşık <b>@GetCalculatedPriceEur() €</b> / ay
+                    </div>
+
+                    @if (isAnnual)
+                    {
+                        <div class="annual-savings-badge">
+                            🎉 Yıllık ödeme ile yılda <b>@GetAnnualSavingsTl().ToString("N0") ₺</b> tasarruf ediyorsunuz!
+                        </div>
+                    }
+
+                    <div class="cta-actions">
+                        <button class="btn-primary-large" @onclick="OpenDemoModal">
+                            🚀 14 Gün Ücretsiz Deneyin
+                        </button>
+                        <a class="btn-secondary-large" href="/">
+                            🔐 Canlı Otel Panelini Test Edin
+                        </a>
+                    </div>
+                </div>
+
+                <!-- Dahil Olan Özellikler Kontrol Listesi -->
+                <div class="result-features-box">
+                    <h3>Bu Pakette Dahil Olanlar</h3>
+                    <ul class="feature-checklist">
+                        <li><span class="chk">✔</span> <b>Bulut Tabanlı Önbüro:</b> Aylık oda takvimi, check-in/out, folyo ve kasa</li>
+                        <li><span class="chk">✔</span> <b>Entegre Kanal Yöneticisi:</b> Booking.com, Airbnb, Expedia, Otelz, Tatilbudur havuz müsaitlik</li>
+                        <li><span class="chk">✔</span> <b>KBS Kimlik Bildirimi:</b> EGM Polis ve Jandarma KBS tek tıkla otomatik bildirim</li>
+                        <li><span class="chk">✔</span> <b>Online Rezervasyon Motoru:</b> Kendi web sitenizden %0 komisyonla doğrudan satış</li>
+                        <li><span class="chk">✔</span> <b>Otel Personel Portalı:</b> Garson, komi, kat hizmetleri iş ilanı verme & başvuru yönetimi</li>
+                        <li><span class="chk">✔</span> <b>Housekeeping & Temizlik:</b> Kirli/temiz oda takibi ve görev atama</li>
+                        <li><span class="chk">✔</span> <b>Sınırsız Kullanıcı:</b> Resepsiyon, müdür, muhasebe için sınırsız kullanıcı ve cihaz</li>
+                        <li><span class="chk">✔</span> <b>7/24 Ücretsiz Destek:</b> Telefon ve uzaktan bağlantı ile sınırsız destek & eğitim</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Paket Kartları Karşılaştırması -->
+    <section class="packages-section">
+        <div class="section-title-wrap">
+            <h2>İşletme Boyutunuza Özel Paketler</h2>
+            <p>Oda kapasitenize göre optimize edilmiş paketlerimizden dilediğinizi seçin.</p>
+        </div>
+
+        <div class="packages-grid">
+            <!-- Paket 1 -->
+            <div class="pkg-card @(roomCount <= 10 ? "active-tier" : "")">
+                <div class="pkg-header">
+                    <span class="pkg-icon">🏡</span>
+                    <h3>Butik & Pansiyon</h3>
+                    <p class="pkg-target">1 – 10 Oda Kapasiteli Tesisler</p>
+                </div>
+                <div class="pkg-price">
+                    <span class="val">@(isAnnual ? "2.490" : "2.990") ₺</span>
+                    <span class="unit">/ ay</span>
+                </div>
+                <p class="eur-info">~88 € / ay</p>
+                <ul class="pkg-specs">
+                    <li>✔ 10 odaya kadar sınırsız rezervasyon</li>
+                    <li>✔ Kanal yöneticisi (Tüm OTA'lar)</li>
+                    <li>✔ Otomatik KBS Polis & Jandarma</li>
+                    <li>✔ Web online rezervasyon motoru</li>
+                    <li>✔ Sınırsız kullanıcı ve cihaz</li>
+                    <li>✔ Ücretsiz uzaktan kurulum & eğitim</li>
+                </ul>
+                <button class="pkg-btn" @onclick="() => SetRoomPreset(8)">Bu Paketi Seç</button>
+            </div>
+
+            <!-- Paket 2 (En Popüler) -->
+            <div class="pkg-card featured @(roomCount > 10 && roomCount <= 25 ? "active-tier" : "")">
+                <div class="featured-ribbon">EN ÇOK TERCİH EDİLEN</div>
+                <div class="pkg-header">
+                    <span class="pkg-icon">🏨</span>
+                    <h3>Orta Ölçek & Şehir Oteli</h3>
+                    <p class="pkg-target">11 – 25 Oda Kapasiteli Tesisler</p>
+                </div>
+                <div class="pkg-price">
+                    <span class="val">@(isAnnual ? "3.240" : "3.890") ₺</span>
+                    <span class="unit">/ ay</span>
+                </div>
+                <p class="eur-info">~115 € / ay</p>
+                <ul class="pkg-specs">
+                    <li>✔ 25 odaya kadar tam operasyon</li>
+                    <li>✔ Çift yönlü Kanal Yöneticisi (Havuz Entegrasyon)</li>
+                    <li>✔ EGM KBS Kimlik & Pasaport tarama</li>
+                    <li>✔ Misafir İlişkileri: Otomatik SMS & E-posta</li>
+                    <li>✔ Housekeeping ve arıza/bakım modülü</li>
+                    <li>✔ Personel Kariyer İlanı verme & aday inceleme</li>
+                    <li>✔ 7/24 Öncelikli telefon desteği</li>
+                </ul>
+                <button class="pkg-btn primary" @onclick="() => SetRoomPreset(20)">Bu Paketi Seç</button>
+            </div>
+
+            <!-- Paket 3 -->
+            <div class="pkg-card @(roomCount > 25 && roomCount <= 50 ? "active-tier" : "")">
+                <div class="pkg-header">
+                    <span class="pkg-icon">🌴</span>
+                    <h3>Resort & Tatil Köyü</h3>
+                    <p class="pkg-target">26 – 50 Oda Kapasiteli Tesisler</p>
+                </div>
+                <div class="pkg-price">
+                    <span class="val">@(isAnnual ? "3.900" : "4.690") ₺</span>
+                    <span class="unit">/ ay</span>
+                </div>
+                <p class="eur-info">~136 € / ay</p>
+                <ul class="pkg-specs">
+                    <li>✔ 50 odaya kadar genişletilmiş kapasite</li>
+                    <li>✔ Tüm OTA kanalları + Çoklu acente & cari hesap</li>
+                    <li>✔ e-Fatura & Maliye entegrasyonu</li>
+                    <li>✔ Çoklu şube ve gelir yönetim araçları</li>
+                    <li>✔ Detaylı doluluk, ADR ve RevPAR analitiği</li>
+                    <li>✔ Garson, Komi, Kat Hizmetleri personel havuzu</li>
+                    <li>✔ Özel atanmış müşteri temsilcisi</li>
+                </ul>
+                <button class="pkg-btn" @onclick="() => SetRoomPreset(40)">Bu Paketi Seç</button>
+            </div>
+
+            <!-- Paket 4 -->
+            <div class="pkg-card @(roomCount > 50 ? "active-tier" : "")">
+                <div class="pkg-header">
+                    <span class="pkg-icon">🏛️</span>
+                    <h3>Zincir & Grup Otel</h3>
+                    <p class="pkg-target">51 – 150+ Oda / Çoklu Tesisler</p>
+                </div>
+                <div class="pkg-price">
+                    <span class="val">@(isAnnual ? "5.400" : "6.490") ₺</span>
+                    <span class="unit">/ ay</span>
+                </div>
+                <p class="eur-info">~185 € / ay</p>
+                <ul class="pkg-specs">
+                    <li>✔ 150+ odaya kadar ve çoklu otel yönetimi</li>
+                    <li>✔ Kurumsal API ve özel PMS entegrasyonları</li>
+                    <li>✔ Kapı kilit ve 5651 uyumlu Hotspot entegrasyonu</li>
+                    <li>✔ Gelişmiş stok, restoran ve adisyon yönetimi</li>
+                    <li>✔ Merkezi raporlama ve finans konsolidasyonu</li>
+                    <li>✔ Kurumsal SLA ve yerinde eğitim desteği</li>
+                </ul>
+                <button class="pkg-btn" @onclick="() => SetRoomPreset(80)">Bu Paketi Seç</button>
+            </div>
+        </div>
+    </section>
+
+    <!-- Sıkça Sorulan Sorular (HMS Otel Yaklaşımı) -->
+    <section class="faq-section">
+        <div class="section-title-wrap">
+            <h2>Sıkça Sorulan Sorular</h2>
+            <p>Otel programı ve kanal yöneticisi hakkında en çok merak edilenler</p>
+        </div>
+
+        <div class="faq-list">
+            <div class="faq-item">
+                <div class="faq-q">Kanal yöneticisi fiyata dahil mi, ayrıca komisyon veya ücret öder miyiz?</div>
+                <div class="faq-a">
+                    <b>Evet, tamamen dahildir.</b> Booking.com, Airbnb, Expedia, Otelz, Tatilbudur gibi 20'den fazla online satış kanalı için ekstra kanal yöneticisi lisans bedeli veya rezervasyon başına komisyon talep edilmez.
+                </div>
+            </div>
+            <div class="faq-item">
+                <div class="faq-q">Otelime kurulum için sunucu veya özel donanım gerekir mi?</div>
+                <div class="faq-a">
+                    <b>Hayır, kurulum gerekmez.</b> Sistemimiz %100 bulut tabanlıdır. Bilgisayarınızdan, tabletinizden veya cep telefonunuzdan internet tarayıcınızla hemen giriş yapabilirsiniz. Güncellemeler ve veri yedeklemeleri otomatik yapılır.
+                </div>
+            </div>
+            <div class="faq-item">
+                <div class="faq-q">Kimlik Bildirim Sistemi (KBS) nasıl çalışır?</div>
+                <div class="faq-a">
+                    Misafiriniz otele geldiğinde kimlik veya pasaport bilgilerini girdiğinizde, EGM Polis ve Jandarma KBS sistemine anında ve otomatik olarak bildirim gönderilir. Ekstra şifre veya kod girmek zorunda kalmazsınız.
+                </div>
+            </div>
+            <div class="faq-item">
+                <div class="faq-q">Otelimiz büyür ve oda sayımız artarsa ne olur?</div>
+                <div class="faq-a">
+                    Oda sayınız arttığında veya yeni bir kat/blok açtığınızda paketinizi anında güncelleyebilirsiniz. Yalnızca kullandığınız oda sayısı kadar adil ve orantılı ödeme yaparsınız.
+                </div>
+            </div>
+            <div class="faq-item">
+                <div class="faq-q">Kaç personelimiz aynı anda sistemi kullanabilir?</div>
+                <div class="faq-a">
+                    <b>Kullanıcı ve cihaz sınırı yoktur.</b> Ön büro, kat hizmetleri, müdür ve muhasebe için ayrı kullanıcılar oluşturabilir, her personele özel yetki tanımlayabilirsiniz.
+                </div>
+            </div>
+            <div class="faq-item">
+                <div class="faq-q">Yeni eklenen Otel Personel & Kariyer modülü nedir?</div>
+                <div class="faq-a">
+                    Turizm sektöründeki personel ihtiyacını çözmek için geliştirdiğimiz bu modül ile oteliniz için açık pozisyon (Garson, Komi, Kat Hizmetleri, Resepsiyonist vb.) yayınlayabilir, sisteme başvuran adayların telefon ve deneyim bilgilerini tek tıkla inceleyebilirsiniz.
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- CTA Bandı -->
+    <section class="pricing-cta-banner">
+        <div class="cta-inner">
+            <div>
+                <h2>Otelinizi Hemen Bugün Dijitalleştirin</h2>
+                <p>14 günlük ücretsiz deneme hesabınızı açalım; kredi kartı gerekmez, aynı gün kullanmaya başlayın.</p>
+            </div>
+            <div class="cta-btns">
+                <button class="btn-cta-primary" @onclick="OpenDemoModal">Ücretsiz Demo Başlat</button>
+                <a class="btn-cta-ghost" href="/jobs">💼 Personel İlanlarını Gör</a>
+            </div>
+        </div>
+    </section>
+</div>
+
+<!-- Demo / Bilgi İsteme Modalı -->
+@if (showDemoModal)
+{
+    <div class="modal-backdrop" @onclick="() => showDemoModal = false">
+        <div class="modal-card" @onclick:stopPropagation>
+            <div class="modal-head">
+                <h3>🏨 14 Günlük Ücretsiz Demo Hesabı</h3>
+                <button class="close-btn" @onclick="() => showDemoModal = false">✕</button>
+            </div>
+            <div class="modal-body">
+                @if (demoSuccess)
+                {
+                    <div class="demo-success-box">
+                        <span class="icon">🎉</span>
+                        <h4>Demo Talebiniz Alındı!</h4>
+                        <p><b>@demoHotelName</b> için deneme hesabınız hazırlanıyor. Müşteri temsilcimiz <b>@demoPhone</b> numaranız üzerinden birkaç dakika içinde size ulaşacaktır.</p>
+                        <button class="btn-primary-large" style="margin-top:16px" @onclick="() => showDemoModal = false">Tamam</button>
+                    </div>
+                }
+                else
+                {
+                    <p class="modal-sub">Seçtiğiniz paket: <b>@roomCount Oda Kapasitesi (@GetTierName(roomCount))</b></p>
+                    <div class="form-row">
+                        <label>Otel / Tesis Adı *</label>
+                        <input type="text" placeholder="Örn: Mavi Butik Otel" @bind="demoHotelName" />
+                    </div>
+                    <div class="form-row">
+                        <label>Yetkili Adı Soyadı *</label>
+                        <input type="text" placeholder="Adınız ve Soyadınız" @bind="demoContactName" />
+                    </div>
+                    <div class="form-grid-2">
+                        <div class="form-row">
+                            <label>Telefon Numarası *</label>
+                            <input type="tel" placeholder="+90 5xx xxx xx xx" @bind="demoPhone" />
+                        </div>
+                        <div class="form-row">
+                            <label>Şehir</label>
+                            <input type="text" placeholder="Örn: Muğla / Bodrum" @bind="demoCity" />
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <label>E-Posta Adresi</label>
+                        <input type="email" placeholder="ornek@otel.com" @bind="demoEmail" />
+                    </div>
+                    <button class="btn-primary-large" style="width:100%;margin-top:14px" @onclick="SubmitDemoRequest">
+                        🚀 Ücretsiz Demo Hesabımı Oluştur
+                    </button>
+                }
+            </div>
+        </div>
+    </div>
+}
+
+<style>
+.pricing-page {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 40px 24px 80px;
+    color: #f1f5f9;
+}
+.pricing-hero {
+    text-align: center;
+    padding: 20px 0 40px;
+}
+.pricing-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 16px;
+    border-radius: 999px;
+    background: hsla(172, 78%, 52%, 0.12);
+    border: 1px solid hsla(172, 78%, 52%, 0.3);
+    color: #2dd4bf;
+    font-size: 0.88rem;
+    font-weight: 600;
+    margin-bottom: 20px;
+}
+.pulse-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #2dd4bf;
+    box-shadow: 0 0 10px #2dd4bf;
+}
+.pricing-hero h1 {
+    font-size: 2.8rem;
+    line-height: 1.2;
+    margin-bottom: 16px;
+    font-weight: 800;
+}
+.gradient-text {
+    background: linear-gradient(135deg, #38bdf8 0%, #2dd4bf 50%, #818cf8 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+.hero-desc {
+    font-size: 1.15rem;
+    color: #94a3b8;
+    max-width: 720px;
+    margin: 0 auto 28px;
+    line-height: 1.6;
+}
+.hero-trust-row {
+    display: flex;
+    justify-content: center;
+    gap: 24px;
+    flex-wrap: wrap;
+}
+.trust-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.92rem;
+    color: #cbd5e1;
+    font-weight: 500;
+}
+.trust-item .icon {
+    color: #2dd4bf;
+    font-weight: 700;
+}
+
+/* Hesaplayıcı */
+.calc-section {
+    margin: 30px 0 60px;
+}
+.calc-card {
+    background: linear-gradient(145deg, hsla(222, 47%, 14%, 0.95), hsla(222, 47%, 9%, 0.95));
+    border: 1px solid hsla(217, 33%, 25%, 0.8);
+    border-radius: 24px;
+    padding: 36px;
+    box-shadow: 0 20px 40px -15px rgba(0, 0, 0, 0.5), 0 0 0 1px hsla(172, 78%, 52%, 0.1);
+}
+.calc-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 20px;
+    margin-bottom: 30px;
+}
+.calc-header h2 {
+    font-size: 1.6rem;
+    margin: 0 0 6px;
+}
+.cycle-toggle {
+    display: inline-flex;
+    background: hsla(217, 33%, 12%, 0.9);
+    padding: 4px;
+    border-radius: 12px;
+    border: 1px solid hsla(217, 33%, 25%, 0.7);
+}
+.cycle-btn {
+    padding: 8px 18px;
+    border: none;
+    background: transparent;
+    color: #94a3b8;
+    border-radius: 8px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.cycle-btn.active {
+    background: #0ea5e9;
+    color: #fff;
+    box-shadow: 0 4px 12px rgba(14, 165, 233, 0.3);
+}
+.discount-pill {
+    background: #10b981;
+    color: #fff;
+    font-size: 0.75rem;
+    padding: 2px 8px;
+    border-radius: 999px;
+    font-weight: 700;
+}
+
+/* Slider kutusu */
+.slider-box {
+    background: hsla(220, 40%, 10%, 0.6);
+    border: 1px solid hsla(217, 33%, 20%, 0.8);
+    border-radius: 18px;
+    padding: 24px 28px;
+    margin-bottom: 30px;
+}
+.slider-val-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 18px;
+}
+.slider-val-row .label {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: #e2e8f0;
+}
+.number-badge {
+    background: linear-gradient(135deg, #0ea5e9, #2dd4bf);
+    padding: 6px 20px;
+    border-radius: 12px;
+    color: #04121e;
+    font-weight: 800;
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+}
+.number-badge .num {
+    font-size: 1.7rem;
+}
+.room-range {
+    width: 100%;
+    height: 10px;
+    border-radius: 5px;
+    background: #1e293b;
+    outline: none;
+    accent-color: #2dd4bf;
+    cursor: pointer;
+}
+.slider-marks {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.8rem;
+    color: #64748b;
+    margin-top: 10px;
+}
+.quick-presets {
+    display: flex;
+    gap: 10px;
+    margin-top: 20px;
+    flex-wrap: wrap;
+}
+.preset-btn {
+    background: hsla(217, 33%, 18%, 0.7);
+    border: 1px solid hsla(217, 33%, 28%, 0.8);
+    color: #cbd5e1;
+    padding: 7px 14px;
+    border-radius: 10px;
+    font-size: 0.86rem;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+.preset-btn:hover, .preset-btn.sel {
+    background: hsla(172, 78%, 52%, 0.2);
+    border-color: #2dd4bf;
+    color: #2dd4bf;
+}
+
+/* Sonuç Grid */
+.calc-result-grid {
+    display: grid;
+    grid-template-columns: 1.1fr 1fr;
+    gap: 30px;
+    align-items: center;
+    background: hsla(220, 40%, 11%, 0.7);
+    border: 1px solid hsla(217, 33%, 22%, 0.9);
+    border-radius: 20px;
+    padding: 30px;
+}
+.result-price-box {
+    padding-right: 20px;
+    border-right: 1px solid hsla(217, 33%, 22%, 0.7);
+}
+.tier-name .tag {
+    background: hsla(217, 91%, 60%, 0.15);
+    color: #38bdf8;
+    border: 1px solid hsla(217, 91%, 60%, 0.3);
+    padding: 4px 12px;
+    border-radius: 8px;
+    font-size: 0.86rem;
+    font-weight: 700;
+    text-transform: uppercase;
+}
+.price-display {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+    margin: 16px 0 6px;
+}
+.price-display .currency {
+    font-size: 2rem;
+    font-weight: 700;
+    color: #2dd4bf;
+}
+.price-display .amount {
+    font-size: 3.4rem;
+    font-weight: 800;
+    color: #fff;
+    line-height: 1;
+}
+.price-display .period {
+    color: #94a3b8;
+    font-size: 1rem;
+}
+.eur-equivalent {
+    font-size: 0.95rem;
+    color: #94a3b8;
+    margin-bottom: 12px;
+}
+.annual-savings-badge {
+    background: hsla(142, 76%, 36%, 0.15);
+    border: 1px solid hsla(142, 76%, 36%, 0.4);
+    color: #34d399;
+    padding: 8px 14px;
+    border-radius: 10px;
+    font-size: 0.88rem;
+    margin-bottom: 20px;
+}
+.cta-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+.btn-primary-large {
+    background: linear-gradient(135deg, #0ea5e9, #0d9488);
+    color: #fff;
+    border: none;
+    padding: 14px 24px;
+    border-radius: 12px;
+    font-size: 1.05rem;
+    font-weight: 700;
+    cursor: pointer;
+    box-shadow: 0 10px 20px -5px rgba(14, 165, 233, 0.4);
+    transition: all 0.2s;
+    text-align: center;
+}
+.btn-primary-large:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 14px 25px -5px rgba(14, 165, 233, 0.5);
+}
+.btn-secondary-large {
+    background: hsla(217, 33%, 20%, 0.8);
+    color: #e2e8f0;
+    border: 1px solid hsla(217, 33%, 30%, 0.8);
+    padding: 12px 20px;
+    border-radius: 12px;
+    font-size: 0.95rem;
+    font-weight: 600;
+    text-decoration: none;
+    text-align: center;
+    transition: all 0.2s;
+}
+.btn-secondary-large:hover {
+    background: hsla(217, 33%, 25%, 1);
+    color: #fff;
+}
+
+/* Feature listesi */
+.result-features-box h3 {
+    font-size: 1.15rem;
+    margin-bottom: 16px;
+    color: #e2e8f0;
+}
+.feature-checklist {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+.feature-checklist li {
+    font-size: 0.9rem;
+    color: #cbd5e1;
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    line-height: 1.4;
+}
+.feature-checklist .chk {
+    color: #2dd4bf;
+    font-weight: 800;
+    flex-shrink: 0;
+}
+
+/* Paketler Bölümü */
+.packages-section {
+    margin: 60px 0;
+}
+.section-title-wrap {
+    text-align: center;
+    margin-bottom: 40px;
+}
+.section-title-wrap h2 {
+    font-size: 2.2rem;
+    margin-bottom: 10px;
+}
+.packages-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 20px;
+}
+.pkg-card {
+    background: hsla(222, 47%, 13%, 0.8);
+    border: 1px solid hsla(217, 33%, 22%, 0.8);
+    border-radius: 20px;
+    padding: 30px 24px;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    transition: all 0.25s ease;
+}
+.pkg-card:hover {
+    border-color: hsla(172, 78%, 52%, 0.5);
+    transform: translateY(-4px);
+}
+.pkg-card.active-tier {
+    border-color: #0ea5e9;
+    box-shadow: 0 0 25px rgba(14, 165, 233, 0.25);
+}
+.pkg-card.featured {
+    background: linear-gradient(160deg, hsla(222, 47%, 16%, 0.95), hsla(222, 47%, 11%, 0.95));
+    border-color: #2dd4bf;
+    box-shadow: 0 15px 35px -10px rgba(45, 212, 191, 0.25);
+}
+.featured-ribbon {
+    position: absolute;
+    top: -12px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: linear-gradient(135deg, #2dd4bf, #0ea5e9);
+    color: #04121e;
+    font-size: 0.72rem;
+    font-weight: 800;
+    padding: 4px 14px;
+    border-radius: 999px;
+    letter-spacing: 0.5px;
+}
+.pkg-icon {
+    font-size: 2rem;
+    margin-bottom: 10px;
+    display: inline-block;
+}
+.pkg-header h3 {
+    font-size: 1.3rem;
+    margin: 0 0 4px;
+}
+.pkg-target {
+    font-size: 0.85rem;
+    color: #94a3b8;
+    margin: 0 0 16px;
+}
+.pkg-price {
+    display: flex;
+    align-items: baseline;
+    gap: 4px;
+}
+.pkg-price .val {
+    font-size: 2.2rem;
+    font-weight: 800;
+    color: #fff;
+}
+.pkg-price .unit {
+    color: #94a3b8;
+    font-size: 0.9rem;
+}
+.eur-info {
+    font-size: 0.82rem;
+    color: #64748b;
+    margin: 2px 0 18px;
+}
+.pkg-specs {
+    list-style: none;
+    padding: 0;
+    margin: 0 0 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    flex-grow: 1;
+}
+.pkg-specs li {
+    font-size: 0.85rem;
+    color: #cbd5e1;
+    line-height: 1.35;
+}
+.pkg-btn {
+    width: 100%;
+    padding: 10px;
+    border-radius: 10px;
+    border: 1px solid hsla(217, 33%, 30%, 0.8);
+    background: hsla(217, 33%, 18%, 0.8);
+    color: #fff;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+.pkg-btn:hover {
+    background: #0ea5e9;
+    border-color: #0ea5e9;
+}
+.pkg-btn.primary {
+    background: linear-gradient(135deg, #0ea5e9, #0d9488);
+    border: none;
+    color: #fff;
+}
+
+/* FAQ */
+.faq-section {
+    margin: 70px 0;
+}
+.faq-list {
+    max-width: 860px;
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+.faq-item {
+    background: hsla(222, 47%, 12%, 0.8);
+    border: 1px solid hsla(217, 33%, 22%, 0.8);
+    border-radius: 14px;
+    padding: 20px 24px;
+}
+.faq-q {
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: #f1f5f9;
+    margin-bottom: 8px;
+}
+.faq-a {
+    font-size: 0.92rem;
+    color: #94a3b8;
+    line-height: 1.55;
+}
+
+/* CTA Bandı */
+.pricing-cta-banner {
+    background: linear-gradient(135deg, hsla(217, 91%, 60%, 0.15), hsla(172, 78%, 52%, 0.15));
+    border: 1px solid hsla(172, 78%, 52%, 0.3);
+    border-radius: 24px;
+    padding: 40px;
+}
+.cta-inner {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 24px;
+}
+.cta-inner h2 {
+    font-size: 1.8rem;
+    margin: 0 0 6px;
+}
+.cta-inner p {
+    color: #cbd5e1;
+    margin: 0;
+}
+.cta-btns {
+    display: flex;
+    gap: 14px;
+    flex-wrap: wrap;
+}
+.btn-cta-primary {
+    background: #2dd4bf;
+    color: #04121e;
+    border: none;
+    padding: 12px 24px;
+    border-radius: 12px;
+    font-weight: 700;
+    font-size: 1rem;
+    cursor: pointer;
+}
+.btn-cta-ghost {
+    background: hsla(217, 33%, 20%, 0.6);
+    color: #fff;
+    border: 1px solid hsla(217, 33%, 35%, 0.8);
+    padding: 12px 20px;
+    border-radius: 12px;
+    text-decoration: none;
+    font-weight: 600;
+}
+
+/* Modal */
+.modal-backdrop {
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0, 0, 0, 0.75);
+    backdrop-filter: blur(6px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    padding: 20px;
+}
+.modal-card {
+    background: #0f172a;
+    border: 1px solid #334155;
+    border-radius: 20px;
+    max-width: 520px;
+    width: 100%;
+    padding: 30px;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7);
+}
+.modal-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 18px;
+}
+.modal-head h3 {
+    margin: 0;
+    font-size: 1.3rem;
+}
+.close-btn {
+    background: transparent;
+    border: none;
+    color: #94a3b8;
+    font-size: 1.2rem;
+    cursor: pointer;
+}
+.modal-sub {
+    font-size: 0.92rem;
+    color: #94a3b8;
+    margin-bottom: 18px;
+}
+.form-row {
+    margin-bottom: 14px;
+}
+.form-row label {
+    display: block;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: #cbd5e1;
+    margin-bottom: 5px;
+}
+.form-row input {
+    width: 100%;
+    padding: 10px 14px;
+    border-radius: 10px;
+    background: #1e293b;
+    border: 1px solid #334155;
+    color: #fff;
+    outline: none;
+}
+.form-row input:focus {
+    border-color: #2dd4bf;
+}
+.form-grid-2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+}
+.demo-success-box {
+    text-align: center;
+    padding: 20px 0;
+}
+.demo-success-box .icon {
+    font-size: 3rem;
+    display: block;
+    margin-bottom: 10px;
+}
+@("@media") (max-width: 850px) {
+    .calc-result-grid {
+        grid-template-columns: 1fr;
+    }
+    .result-price-box {
+        padding-right: 0;
+        border-right: none;
+        border-bottom: 1px solid hsla(217, 33%, 22%, 0.7);
+        padding-bottom: 24px;
+    }
+}
+</style>
+
+@code {
+    int roomCount = 20;
+    bool isAnnual = true;
+    bool showDemoModal = false;
+    bool demoSuccess = false;
+
+    string demoHotelName = "";
+    string demoContactName = "";
+    string demoPhone = "";
+    string demoCity = "";
+    string demoEmail = "";
+
+    void SetRoomPreset(int rooms)
+    {
+        roomCount = rooms;
+    }
+
+    string GetTierName(int rooms) => rooms switch
+    {
+        <= 10 => "Butik & Pansiyon",
+        <= 25 => "Orta Ölçek Tesis",
+        <= 50 => "Resort & Tatil Köyü",
+        <= 100 => "Büyük Tesis",
+        _ => "Zincir & Grup Otel"
+    };
+
+    decimal GetCalculatedPriceTl()
+    {
+        // 1-10 oda: 2990 TL/ay
+        // 11-25 oda: 3890 TL/ay
+        // 26-50 oda: 4690 TL/ay
+        // 51-100 oda: 6490 TL/ay
+        // 100+ oda: 8490 TL + her ekstra 20 oda için 500 TL
+        decimal baseMonthly = roomCount switch
+        {
+            <= 10 => 2990m,
+            <= 25 => 3890m,
+            <= 50 => 4690m,
+            <= 100 => 6490m,
+            _ => 8490m + ((roomCount - 100) / 20) * 500m
+        };
+
+        if (isAnnual)
+        {
+            // %17 indirim (2 ay hediye)
+            return Math.Round(baseMonthly * 0.833m);
+        }
+        return baseMonthly;
+    }
+
+    int GetCalculatedPriceEur()
+    {
+        decimal tl = GetCalculatedPriceTl();
+        return (int)Math.Round(tl / 34m); // yaklaşık kur
+    }
+
+    decimal GetAnnualSavingsTl()
+    {
+        decimal monthlyPrice = roomCount switch
+        {
+            <= 10 => 2990m,
+            <= 25 => 3890m,
+            <= 50 => 4690m,
+            <= 100 => 6490m,
+            _ => 8490m + ((roomCount - 100) / 20) * 500m
+        };
+        // 2 aylık tasarruf
+        return monthlyPrice * 2;
+    }
+
+    void OpenDemoModal()
+    {
+        showDemoModal = true;
+        demoSuccess = false;
+    }
+
+    void SubmitDemoRequest()
+    {
+        if (string.IsNullOrWhiteSpace(demoHotelName)) demoHotelName = "Örnek Butik Otel";
+        if (string.IsNullOrWhiteSpace(demoPhone)) demoPhone = "+90 532 123 45 67";
+        demoSuccess = true;
+    }
+}
